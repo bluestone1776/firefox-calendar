@@ -228,3 +228,83 @@ export async function createEvent(
     throw error;
   }
 }
+
+/**
+ * Updates an existing event
+ * @param eventId - Event ID
+ * @param payload - Updated event data (partial)
+ */
+export async function updateEvent(
+  eventId: string,
+  payload: Partial<Omit<Event, 'id' | 'created_at' | 'updated_at'>>
+): Promise<Event> {
+  try {
+    if (!eventId) {
+      throw new Error('Event ID is required');
+    }
+
+    // Validate event type if provided
+    if (payload.type && !['meeting', 'personal', 'leave'].includes(payload.type)) {
+      throw new Error('Invalid event type. Must be: meeting, personal, or leave');
+    }
+
+    // Validate dates if provided
+    if (payload.start || payload.end) {
+      const startDate = payload.start ? dayjs(payload.start) : null;
+      const endDate = payload.end ? dayjs(payload.end) : null;
+
+      // If both are provided, validate them together
+      if (startDate && endDate) {
+        if (!startDate.isValid() || !endDate.isValid()) {
+          throw new Error('Invalid date format. Use ISO 8601 format.');
+        }
+        if (endDate.isBefore(startDate) || endDate.isSame(startDate)) {
+          throw new Error('End date must be after start date');
+        }
+      }
+    }
+
+    const { data, error } = await supabase
+      .from('events')
+      .update(payload)
+      .eq('id', eventId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating event:', error);
+      throw new Error(`Failed to update event: ${error.message}`);
+    }
+
+    if (!data) {
+      throw new Error('Event update returned no data');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in updateEvent:', error);
+    throw error;
+  }
+}
+
+/**
+ * Deletes an event
+ * @param eventId - Event ID
+ */
+export async function deleteEvent(eventId: string): Promise<void> {
+  try {
+    if (!eventId) {
+      throw new Error('Event ID is required');
+    }
+
+    const { error } = await supabase.from('events').delete().eq('id', eventId);
+
+    if (error) {
+      console.error('Error deleting event:', error);
+      throw new Error(`Failed to delete event: ${error.message}`);
+    }
+  } catch (error) {
+    console.error('Error in deleteEvent:', error);
+    throw error;
+  }
+}

@@ -5,8 +5,8 @@ interface ButtonProps {
   onPress: () => void;
   disabled?: boolean;
   variant?: 'primary' | 'secondary' | 'outline';
-  style?: ViewStyle;
-  textStyle?: TextStyle;
+  style?: ViewStyle | ViewStyle[];
+  textStyle?: TextStyle | TextStyle[];
 }
 
 export function Button({

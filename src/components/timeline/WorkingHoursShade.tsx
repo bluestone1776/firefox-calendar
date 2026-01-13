@@ -4,11 +4,12 @@ import { WeeklyHours } from '../../types';
 
 interface WorkingHoursShadeProps {
   workingHours: WeeklyHours;
+  dayStartHour?: number;
 }
 
-export function WorkingHoursShade({ workingHours }: WorkingHoursShadeProps) {
+export function WorkingHoursShade({ workingHours, dayStartHour = DAY_START_HOUR }: WorkingHoursShadeProps) {
   const getPosition = (hour: number, minute: number) => {
-    const minutesFromStart = (hour - DAY_START_HOUR) * 60 + minute;
+    const minutesFromStart = (hour - dayStartHour) * 60 + minute;
     return minutesFromStart * PX_PER_MIN;
   };
 

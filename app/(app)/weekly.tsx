@@ -21,13 +21,13 @@ import { TIME_BLOCK_MINUTES, DAY_START_HOUR, DAY_END_HOUR } from '../../src/cons
 import { Button } from '../../src/components/ui/Button';
 
 const WEEKDAYS = [
-  'Sunday',
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
+  { name: 'Monday', index: 1 },
+  { name: 'Tuesday', index: 2 },
+  { name: 'Wednesday', index: 3 },
+  { name: 'Thursday', index: 4 },
+  { name: 'Friday', index: 5 },
+  { name: 'Saturday', index: 6 },
+  { name: 'Sunday', index: 0 },
 ];
 
 // Generate time options in 30-min increments
@@ -259,19 +259,42 @@ export default function WeeklyScreen() {
           </View>
         )}
 
+        {/* Copy Monday to Weekdays button */}
+        <View style={styles.copyButtonContainer}>
+          <Button
+            title="Copy Mon to Weekdays"
+            onPress={() => {
+              const mondayHours = hours[1];
+              if (mondayHours && mondayHours.enabled) {
+                const newHours = { ...hours };
+                [2, 3, 4, 5].forEach((dayIndex) => {
+                  newHours[dayIndex] = {
+                    ...mondayHours,
+                  };
+                });
+                setHours(newHours);
+              } else {
+                Alert.alert('Info', 'Please enable Monday hours first');
+              }
+            }}
+            variant="outline"
+            style={styles.copyButton}
+          />
+        </View>
+
         {/* Weekly hours for each day */}
-        {WEEKDAYS.map((dayName, dayIndex) => {
-          const dayHours = hours[dayIndex];
+        {WEEKDAYS.map((day) => {
+          const dayHours = hours[day.index];
           return (
-            <View key={dayIndex} style={styles.dayRow}>
+            <View key={day.index} style={styles.dayRow}>
               <View style={styles.dayHeader}>
-                <Text style={styles.dayName}>{dayName}</Text>
+                <Text style={styles.dayName}>{day.name}</Text>
                 <Switch
                   value={dayHours.enabled}
                   onValueChange={(enabled) =>
                     setHours({
                       ...hours,
-                      [dayIndex]: { ...dayHours, enabled },
+                      [day.index]: { ...dayHours, enabled },
                     })
                   }
                 />
@@ -281,7 +304,7 @@ export default function WeeklyScreen() {
                 <View style={styles.timeRow}>
                   <TouchableOpacity
                     style={styles.timeButton}
-                    onPress={() => openTimePicker(dayIndex, 'start')}
+                    onPress={() => openTimePicker(day.index, 'start')}
                   >
                     <Text style={styles.timeButtonText}>
                       Start: {formatTime(dayHours.startHour, dayHours.startMinute)}
@@ -290,7 +313,7 @@ export default function WeeklyScreen() {
 
                   <TouchableOpacity
                     style={styles.timeButton}
-                    onPress={() => openTimePicker(dayIndex, 'end')}
+                    onPress={() => openTimePicker(day.index, 'end')}
                   >
                     <Text style={styles.timeButtonText}>
                       End: {formatTime(dayHours.endHour, dayHours.endMinute)}
@@ -375,6 +398,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#000000',
+  },
+  copyButtonContainer: {
+    marginBottom: 16,
+  },
+  copyButton: {
+    marginTop: 0,
   },
   pickerContainer: {
     flexDirection: 'row',

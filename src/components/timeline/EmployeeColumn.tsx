@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import dayjs from 'dayjs';
 import { Profile, WeeklyHours, Event } from '../../types';
 import { DAY_START_HOUR, DAY_END_HOUR, PX_PER_MIN } from '../../constants/time';
 import { WorkingHoursShade } from './WorkingHoursShade';
@@ -9,6 +10,14 @@ interface EmployeeColumnProps {
   workingHours?: WeeklyHours;
   events: Event[];
   timezone: string;
+  onEventPress?: (event: Event) => void;
+  onEventLongPress?: (event: Event) => void;
+  onEventDragEnd?: (event: Event, newStartTime: dayjs.Dayjs, newEndTime: dayjs.Dayjs) => void;
+  onEmptyAreaPress?: (profileId: string, timeMinutes: number) => void;
+  dayStartHour?: number;
+  dayEndHour?: number;
+  showHeader?: boolean;
+  getEventConflict?: (event: Event) => boolean;
 }
 
 export function EmployeeColumn({
@@ -16,24 +25,56 @@ export function EmployeeColumn({
   workingHours,
   events,
   timezone,
+  onEventPress,
+  onEventLongPress,
+  onEventDragEnd,
+  onEmptyAreaPress,
+  dayStartHour = DAY_START_HOUR,
+  dayEndHour = DAY_END_HOUR,
+  showHeader = true,
+  getEventConflict,
 }: EmployeeColumnProps) {
   // Calculate total height based on day duration
-  const totalMinutes = (DAY_END_HOUR - DAY_START_HOUR) * 60;
+  const totalMinutes = (dayEndHour - dayStartHour) * 60;
   const totalHeight = totalMinutes * PX_PER_MIN;
+
+  const handleTimelinePress = (event: any) => {
+    if (!onEmptyAreaPress) return;
+    // Get the touch location relative to the timeline
+    const { locationY } = event.nativeEvent;
+    // Calculate time in minutes from day start
+    const timeMinutes = Math.floor(locationY / PX_PER_MIN);
+    onEmptyAreaPress(profile.id, timeMinutes);
+  };
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.name} numberOfLines={1}>
-          {profile.email.split('@')[0]}
-        </Text>
-      </View>
-      <View style={[styles.timeline, { height: totalHeight }]}>
-        {workingHours && <WorkingHoursShade workingHours={workingHours} />}
+      {showHeader && (
+        <View style={styles.header}>
+          <Text style={styles.name} numberOfLines={1}>
+            {profile.email.split('@')[0]}
+          </Text>
+        </View>
+      )}
+      <TouchableOpacity
+        style={[styles.timeline, { height: totalHeight }]}
+        onPress={handleTimelinePress}
+        activeOpacity={1}
+      >
+        {workingHours && <WorkingHoursShade workingHours={workingHours} dayStartHour={dayStartHour} />}
         {events.map((event) => (
-          <EventBlock key={event.id} event={event} timezone={timezone} />
+          <EventBlock
+            key={event.id}
+            event={event}
+            timezone={timezone}
+            onPress={onEventPress}
+            onLongPress={onEventLongPress}
+            onDragEnd={onEventDragEnd}
+            dayStartHour={dayStartHour}
+            hasConflict={getEventConflict ? getEventConflict(event) : false}
+          />
         ))}
-      </View>
+      </TouchableOpacity>
     </View>
   );
 }

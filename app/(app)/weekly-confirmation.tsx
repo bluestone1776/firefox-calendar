@@ -10,9 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
-import timezone from 'dayjs/plugin/timezone';
+import { format, getDay, addDays, subDays, startOfWeek } from 'date-fns';
 import { useAuth } from '../../src/hooks/useAuth';
 import {
   getPayrollConfirmationsForWeek,
@@ -22,9 +20,6 @@ import { getWeeklyHoursForUser } from '../../src/data/schedule';
 import { PayrollConfirmation, WeeklyHours } from '../../src/types';
 import { Button } from '../../src/components/ui/Button';
 import { getTimezone, getDefaultTimezone } from '../../src/utils/timezone';
-
-dayjs.extend(utc);
-dayjs.extend(timezone);
 
 const WEEKDAYS = [
   { name: 'Monday', index: 1 },
@@ -50,8 +45,8 @@ export default function WeeklyConfirmationScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
-    const today = dayjs();
-    const monday = today.startOf('week').add(1, 'day'); // Monday
+    const today = new Date();
+    const monday = startOfWeek(today, { weekStartsOn: 1 }); // Monday
     return monday;
   });
   const [days, setDays] = useState<DayConfirmation[]>([]);
@@ -91,10 +86,10 @@ export default function WeeklyConfirmationScreen() {
       // Calculate week dates
       const weekDates: DayConfirmation[] = [];
       for (let i = 0; i < 7; i++) {
-        const date = currentWeekStart.add(i, 'day');
-        const weekday = date.day();
+        const date = addDays(currentWeekStart, i);
+        const weekday = getDay(date);
         const dayName = WEEKDAYS.find((d) => d.index === weekday)?.name || 'Unknown';
-        const dateISO = date.format('YYYY-MM-DD');
+        const dateISO = format(date, 'yyyy-MM-dd');
 
         // Calculate expected hours for this day
         const dayHours = hours.find((h) => h.day_of_week === weekday);
@@ -116,7 +111,7 @@ export default function WeeklyConfirmationScreen() {
       }
 
       // Load existing confirmations
-      const weekStartISO = currentWeekStart.format('YYYY-MM-DD');
+      const weekStartISO = format(currentWeekStart, 'yyyy-MM-dd');
       const confirmations = await getPayrollConfirmationsForWeek(user.id, weekStartISO);
 
       // Merge confirmations with week dates
@@ -223,8 +218,8 @@ export default function WeeklyConfirmationScreen() {
     updateDay(index, { hours: finalValue });
   };
 
-  const weekEnd = currentWeekStart.add(6, 'days');
-  const weekLabel = `${currentWeekStart.format('MMM D')} - ${weekEnd.format('MMM D, YYYY')}`;
+  const weekEnd = addDays(currentWeekStart, 6);
+  const weekLabel = `${format(currentWeekStart, 'MMM d')} - ${format(weekEnd, 'MMM d, yyyy')}`;
   const totalConfirmedHours = days
     .filter((d) => d.confirmed)
     .reduce((sum, d) => sum + parseFloat(d.hours || '0'), 0);
@@ -243,21 +238,21 @@ export default function WeeklyConfirmationScreen() {
       <View style={styles.header}>
         <View style={styles.weekNavigation}>
           <TouchableOpacity
-            onPress={() => setCurrentWeekStart(currentWeekStart.subtract(7, 'day'))}
+            onPress={() => setCurrentWeekStart(subDays(currentWeekStart, 7))}
             style={styles.navButton}
           >
             <Text style={styles.navButtonText}>← Prev</Text>
           </TouchableOpacity>
           <Text style={styles.weekLabel}>{weekLabel}</Text>
           <TouchableOpacity
-            onPress={() => setCurrentWeekStart(currentWeekStart.add(7, 'day'))}
+            onPress={() => setCurrentWeekStart(addDays(currentWeekStart, 7))}
             style={styles.navButton}
           >
             <Text style={styles.navButtonText}>Next →</Text>
           </TouchableOpacity>
         </View>
         <TouchableOpacity
-          onPress={() => setCurrentWeekStart(dayjs().startOf('week').add(1, 'day'))}
+          onPress={() => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
           style={styles.todayButton}
         >
           <Text style={styles.todayButtonText}>This Week</Text>
@@ -278,7 +273,7 @@ export default function WeeklyConfirmationScreen() {
           <View style={styles.dayHeader}>
             <View style={styles.dayInfo}>
               <Text style={styles.dayName}>{day.dayName}</Text>
-              <Text style={styles.dayDate}>{dayjs(day.date).format('MMM D')}</Text>
+              <Text style={styles.dayDate}>{format(new Date(day.date), 'MMM d')}</Text>
             </View>
             <TouchableOpacity
               style={[styles.checkbox, day.confirmed && styles.checkboxChecked]}

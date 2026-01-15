@@ -2,19 +2,15 @@ import { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, PanResponder, Animated, Pressable } from 'react-native';
 import { Event } from '../../types';
 import { DAY_START_HOUR, PX_PER_MIN, TIME_BLOCK_MINUTES } from '../../constants/time';
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
-import timezone from 'dayjs/plugin/timezone';
-
-dayjs.extend(utc);
-dayjs.extend(timezone);
+import { format, getHours, getMinutes, differenceInMinutes, addMinutes } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
 
 interface EventBlockProps {
   event: Event;
   timezone: string;
   onPress?: (event: Event) => void;
   onLongPress?: (event: Event) => void;
-  onDragEnd?: (event: Event, newStartTime: dayjs.Dayjs, newEndTime: dayjs.Dayjs) => void;
+  onDragEnd?: (event: Event, newStartTime: Date, newEndTime: Date) => void;
   dayStartHour?: number;
   hasConflict?: boolean;
 }
@@ -30,14 +26,14 @@ export function EventBlock({
 }: EventBlockProps) {
   // Parse event times from UTC and convert to the given timezone
   // Events are stored as UTC ISO strings, so parse as UTC first, then convert to target timezone
-  const startTime = dayjs(event.start).utc().tz(timezone);
-  const endTime = dayjs(event.end).utc().tz(timezone);
-  const durationMinutes = endTime.diff(startTime, 'minute');
+  const startTime = toZonedTime(new Date(event.start), timezone);
+  const endTime = toZonedTime(new Date(event.end), timezone);
+  const durationMinutes = differenceInMinutes(endTime, startTime);
 
   // Calculate position based on minutes from day start
-  const getPosition = (date: dayjs.Dayjs) => {
-    const hour = date.hour();
-    const minute = date.minute();
+  const getPosition = (date: Date) => {
+    const hour = getHours(date);
+    const minute = getMinutes(date);
     const minutesFromStart = (hour - dayStartHour) * 60 + minute;
     return minutesFromStart * PX_PER_MIN;
   };
@@ -71,8 +67,8 @@ export function EventBlock({
         const deltaMinutes = Math.round(deltaY / PX_PER_MIN / TIME_BLOCK_MINUTES) * TIME_BLOCK_MINUTES;
 
         if (deltaMinutes !== 0 && onDragEnd) {
-          const newStartTime = startTime.add(deltaMinutes, 'minute');
-          const newEndTime = endTime.add(deltaMinutes, 'minute');
+          const newStartTime = addMinutes(startTime, deltaMinutes);
+          const newEndTime = addMinutes(endTime, deltaMinutes);
           onDragEnd(event, newStartTime, newEndTime);
         }
 
@@ -140,7 +136,7 @@ export function EventBlock({
       
       <View style={styles.timeHeader}>
         <Text style={[styles.timeStart, getTypeTextStyle()]} numberOfLines={1}>
-          {startTime.format('h:mm')}
+          {format(startTime, 'h:mm')}
         </Text>
         {height > 40 && (
           <Text style={[styles.duration, getTypeTextStyle()]} numberOfLines={1}>
@@ -155,7 +151,7 @@ export function EventBlock({
       
       {height > 50 && (
         <Text style={[styles.timeEnd, getTypeTextStyle()]} numberOfLines={1}>
-          Until {endTime.format('h:mm A')}
+          Until {format(endTime, 'h:mm a')}
         </Text>
       )}
 
@@ -163,7 +159,7 @@ export function EventBlock({
       {isDragging && (
         <View style={styles.dragIndicator}>
           <Text style={styles.dragText}>
-            {startTime.add(Math.round((dragY as any)._value / PX_PER_MIN / TIME_BLOCK_MINUTES) * TIME_BLOCK_MINUTES, 'minute').format('h:mm A')}
+            {format(addMinutes(startTime, Math.round((dragY as any)._value / PX_PER_MIN / TIME_BLOCK_MINUTES) * TIME_BLOCK_MINUTES), 'h:mm a')}
           </Text>
         </View>
       )}

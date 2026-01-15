@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import dayjs from 'dayjs';
+// date-fns-tz is now used instead of dayjs
 import { Profile, WeeklyHours, Event } from '../../types';
 import { DAY_START_HOUR, DAY_END_HOUR, PX_PER_MIN } from '../../constants/time';
 import { WorkingHoursShade } from './WorkingHoursShade';
@@ -12,7 +12,7 @@ interface EmployeeColumnProps {
   timezone: string;
   onEventPress?: (event: Event) => void;
   onEventLongPress?: (event: Event) => void;
-  onEventDragEnd?: (event: Event, newStartTime: dayjs.Dayjs, newEndTime: dayjs.Dayjs) => void;
+  onEventDragEnd?: (event: Event, newStartTime: Date, newEndTime: Date) => void;
   onEmptyAreaPress?: (profileId: string, timeMinutes: number) => void;
   dayStartHour?: number;
   dayEndHour?: number;

@@ -12,9 +12,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
-import timezone from 'dayjs/plugin/timezone';
+import { format, parse, getDay, getHours, getMinutes, addDays, subDays, isSameDay, startOfDay, endOfDay, addMinutes, differenceInMinutes, setHours, setMinutes } from 'date-fns';
+import { toZonedTime, fromZonedTime, format as formatTZ } from 'date-fns-tz';
 import { listProfiles } from '../../src/data/profiles';
 import {
   getWeeklyHoursForWeekday,
@@ -40,15 +39,14 @@ import {
 } from '../../src/utils/schedule';
 import { getTimezone, getDefaultTimezone } from '../../src/utils/timezone';
 
-dayjs.extend(utc);
-dayjs.extend(timezone);
+// date-fns-tz is now used instead of dayjs
 
 const DEFAULT_TZ = process.env.EXPO_PUBLIC_DEFAULT_TZ || 'Australia/Sydney';
 
 export default function DailyScreen() {
   const router = useRouter();
   const { isAdmin, user, profile } = useAuth();
-  const [currentDate, setCurrentDate] = useState(() => dayjs.tz(undefined, getDefaultTimezone()));
+  const [currentDate, setCurrentDate] = useState(() => toZonedTime(new Date(), getDefaultTimezone()));
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [weeklyHours, setWeeklyHours] = useState<Map<string, WeeklyHours>>(
     new Map()
@@ -85,8 +83,8 @@ export default function DailyScreen() {
     // Convert currentDate to the new timezone while preserving the same calendar date
     // Only update if timezone has actually changed from default
     if (!isFirstMount.current) {
-      const dateStr = currentDate.format('YYYY-MM-DD');
-      setCurrentDate(dayjs.tz(dateStr, currentTimezone));
+      const dateStr = format(currentDate, 'yyyy-MM-dd');
+      setCurrentDate(toZonedTime(parse(dateStr, 'yyyy-MM-dd', new Date()), currentTimezone));
     }
   }, [currentTimezone]);
 
@@ -120,11 +118,11 @@ export default function DailyScreen() {
     try {
       // Get weekday (0 = Sunday, 1 = Monday, etc.)
       // Ensure currentDate is in the correct timezone
-      const dateInTimezone = currentDate.tz(currentTimezone);
-      const weekday = dateInTimezone.day();
+      const dateInTimezone = toZonedTime(currentDate, currentTimezone);
+      const weekday = getDay(dateInTimezone);
 
       // Get date in ISO format (YYYY-MM-DD) in the target timezone
-      const dateISO = dateInTimezone.format('YYYY-MM-DD');
+      const dateISO = format(dateInTimezone, 'yyyy-MM-dd');
 
       // Load profiles
       const profilesData = await listProfiles();
@@ -167,37 +165,37 @@ export default function DailyScreen() {
 
   const navigateDate = (direction: 'prev' | 'next' | 'today') => {
     if (direction === 'today') {
-      setCurrentDate(dayjs.tz(undefined, currentTimezone));
+      setCurrentDate(toZonedTime(new Date(), currentTimezone));
     } else if (direction === 'prev') {
-      setCurrentDate(currentDate.subtract(1, 'day'));
+      setCurrentDate(subDays(currentDate, 1));
     } else {
-      setCurrentDate(currentDate.add(1, 'day'));
+      setCurrentDate(addDays(currentDate, 1));
     }
   };
 
-  const formatDate = (date: dayjs.Dayjs) => {
-    const today = dayjs.tz(undefined, currentTimezone);
-    if (date.isSame(today, 'day')) {
+  const formatDate = (date: Date) => {
+    const today = toZonedTime(new Date(), currentTimezone);
+    if (isSameDay(date, today)) {
       return 'Today';
     }
-    return date.format('ddd, MMM D');
+    return format(date, 'EEE, MMM d');
   };
 
-  const formatDateFull = (date: dayjs.Dayjs) => {
-    return date.format('ddd, MMM D, YYYY');
+  const formatDateFull = (date: Date) => {
+    return format(date, 'EEE, MMM d, yyyy');
   };
 
   const handleAddEvent = () => {
     router.push({
       pathname: '/(app)/event-editor',
-      params: { date: currentDate.format('YYYY-MM-DD') },
+      params: { date: format(currentDate, 'yyyy-MM-dd') },
     });
   };
 
   const handleJumpToNow = () => {
-    const now = dayjs.tz(undefined, currentTimezone);
-    const hour = now.hour();
-    const minute = now.minute();
+    const now = toZonedTime(new Date(), currentTimezone);
+    const hour = getHours(now);
+    const minute = getMinutes(now);
     const minutesFromStart = (hour - dayStartHour) * 60 + minute;
     const scrollPosition = minutesFromStart * PX_PER_MIN - 100; // Offset for visibility
 
@@ -221,7 +219,7 @@ export default function DailyScreen() {
     router.push({
       pathname: '/(app)/event-editor',
       params: {
-        date: currentDate.format('YYYY-MM-DD'),
+        date: format(currentDate, 'yyyy-MM-dd'),
         userId: profileId,
         startHour: hour.toString(),
         startMinute: snappedMinute.toString(),
@@ -231,9 +229,9 @@ export default function DailyScreen() {
     });
   };
 
-  // Compute Now Summary
-  const now = dayjs.tz(undefined, currentTimezone);
-  const isToday = currentDate.isSame(now, 'day');
+  // Compute Now Summary - get current time in selected timezone
+  const now = toZonedTime(new Date(), currentTimezone);
+  const isToday = isSameDay(currentDate, now);
   let workingCount = 0;
   let busyCount = 0;
   let offCount = 0;
@@ -301,26 +299,26 @@ export default function DailyScreen() {
 
   const handleEventDragEnd = async (
     event: Event,
-    newStartTime: dayjs.Dayjs,
-    newEndTime: dayjs.Dayjs
+    newStartTime: Date,
+    newEndTime: Date
   ) => {
     try {
-      const duration = newEndTime.diff(newStartTime, 'minute');
-      const originalStart = dayjs(event.start).utc().tz(currentTimezone);
-      const originalEnd = dayjs(event.end).utc().tz(currentTimezone);
-      const originalDuration = originalEnd.diff(originalStart, 'minute');
+      const duration = differenceInMinutes(newEndTime, newStartTime);
+      const originalStart = toZonedTime(new Date(event.start), currentTimezone);
+      const originalEnd = toZonedTime(new Date(event.end), currentTimezone);
+      const originalDuration = differenceInMinutes(originalEnd, originalStart);
 
       // If duration changed significantly, keep original duration
       const finalEndTime =
         Math.abs(duration - originalDuration) > 15
-          ? newStartTime.add(originalDuration, 'minute')
+          ? addMinutes(newStartTime, originalDuration)
           : newEndTime;
 
       // newStartTime and finalEndTime are already in currentTimezone
       // Convert to UTC ISO string for storage
       await updateEvent(event.id, {
-        start: newStartTime.toISOString(),
-        end: finalEndTime.toISOString(),
+        start: fromZonedTime(newStartTime, currentTimezone).toISOString(),
+        end: fromZonedTime(finalEndTime, currentTimezone).toISOString(),
       });
 
       // Refresh data to show updated position (silent refresh)
@@ -342,17 +340,17 @@ export default function DailyScreen() {
     if (!selectedEvent) return;
 
     try {
-      const startTime = dayjs(selectedEvent.start).utc().tz(currentTimezone);
-      const endTime = dayjs(selectedEvent.end).utc().tz(currentTimezone);
-      const duration = endTime.diff(startTime, 'minute');
+      const startTime = toZonedTime(new Date(selectedEvent.start), currentTimezone);
+      const endTime = toZonedTime(new Date(selectedEvent.end), currentTimezone);
+      const duration = differenceInMinutes(endTime, startTime);
 
       // Create duplicate 30 minutes after original (or next day if at end of day)
-      let newStartTime = startTime.add(30, 'minute');
-      if (newStartTime.hour() >= 23) {
+      let newStartTime = addMinutes(startTime, 30);
+      if (getHours(newStartTime) >= 23) {
         // If would go past midnight, move to next day at same time
-        newStartTime = startTime.add(1, 'day');
+        newStartTime = addDays(startTime, 1);
       }
-      const newEndTime = newStartTime.add(duration, 'minute');
+      const newEndTime = addMinutes(newStartTime, duration);
 
       // newStartTime and newEndTime are already in currentTimezone
       // Convert to UTC ISO string for storage
@@ -360,8 +358,8 @@ export default function DailyScreen() {
         {
           profile_id: selectedEvent.profile_id,
           title: selectedEvent.title,
-          start: newStartTime.toISOString(),
-          end: newEndTime.toISOString(),
+          start: fromZonedTime(newStartTime, currentTimezone).toISOString(),
+          end: fromZonedTime(newEndTime, currentTimezone).toISOString(),
           type: selectedEvent.type,
         },
         undefined
@@ -380,12 +378,12 @@ export default function DailyScreen() {
   // Generate date options for picker (today ± 60 days)
   const generateDateOptions = () => {
     const options: { value: string; display: string }[] = [];
-    const today = dayjs.tz(undefined, currentTimezone);
+    const today = toZonedTime(new Date(), currentTimezone);
     for (let i = -60; i <= 60; i++) {
-      const d = today.add(i, 'day');
+      const d = addDays(today, i);
       options.push({
-        value: d.format('YYYY-MM-DD'),
-        display: d.format('ddd, MMM D, YYYY'),
+        value: format(d, 'yyyy-MM-dd'),
+        display: format(d, 'EEE, MMM d, yyyy'),
       });
     }
     return options;
@@ -490,7 +488,7 @@ export default function DailyScreen() {
           </View>
           {nextChange && (
             <Text style={styles.nextChange}>
-              Next: {nextChange.format('h:mm A')}
+              Next: {format(nextChange, 'h:mm a')}
             </Text>
           )}
         </View>
@@ -536,13 +534,13 @@ export default function DailyScreen() {
 
       {/* Daily Confirmation (Staff only, Today only) - Only show if user is logged in */}
       {/* Temporarily disabled to debug white screen issue */}
-      {false && !isAdmin && user?.id && currentDate.isSame(dayjs.tz(undefined, currentTimezone), 'day') && (
+      {false && !isAdmin && user?.id && isSameDay(currentDate, toZonedTime(new Date(), currentTimezone)) && (
         <View style={styles.dailyConfirmationContainer}>
           <DailyConfirmation
             date={currentDate}
             expectedHours={(() => {
               if (!user?.id) return undefined;
-              const weekday = currentDate.day();
+              const weekday = getDay(currentDate);
               const userId = user.id;
               const userHours = weeklyHours.get(userId);
               if (!userHours || userHours.day_of_week !== weekday) {
@@ -644,9 +642,10 @@ export default function DailyScreen() {
                         styles.nowLine,
                         {
                           top: (() => {
-                            const now = dayjs.tz(undefined, currentTimezone);
-                            const hour = now.hour();
-                            const minute = now.minute();
+                            console.log(currentTimezone, formatTZ(toZonedTime(new Date(), currentTimezone), 'HH:mm', { timeZone: currentTimezone }));
+                            const now = toZonedTime(new Date(), currentTimezone);
+                            const hour = getHours(now);
+                            const minute = getMinutes(now);
                             const minutesFromStart = (hour - dayStartHour) * 60 + minute;
                             return minutesFromStart * PX_PER_MIN;
                           })(),
@@ -725,14 +724,14 @@ export default function DailyScreen() {
             const profileEvents = events.get(profile.id) || [];
       const statusInfo = computeStatusForUserAtTime(
         profile.id,
-        isToday ? now : currentDate.hour(12).minute(0),
+        isToday ? now : setMinutes(setHours(currentDate, 12), 0),
         currentTimezone,
         profileHours,
         profileEvents
       );
       const nextBlock = getNextBlockForUser(
         profile.id,
-        isToday ? now : currentDate.hour(12).minute(0),
+        isToday ? now : setMinutes(setHours(currentDate, 12), 0),
         currentTimezone,
         profileHours,
         profileEvents
@@ -798,7 +797,7 @@ export default function DailyScreen() {
                 )}
                 {nextBlock && (
                   <Text style={styles.availabilityNext}>
-                    Next: {nextBlock.title} at {nextBlock.time.format('h:mm A')}
+                    Next: {nextBlock.title} at {format(nextBlock.time, 'h:mm a')}
                   </Text>
                 )}
               </View>
@@ -821,12 +820,12 @@ export default function DailyScreen() {
               data={DATE_OPTIONS}
               keyExtractor={(item) => item.value}
               renderItem={({ item }) => {
-                const isSelected = item.value === currentDate.format('YYYY-MM-DD');
+                const isSelected = item.value === format(currentDate, 'yyyy-MM-dd');
                 return (
                   <TouchableOpacity
                     style={[styles.dateOption, isSelected && styles.dateOptionSelected]}
                     onPress={() => {
-                      setCurrentDate(dayjs.tz(item.value, currentTimezone));
+                      setCurrentDate(toZonedTime(parse(item.value, 'yyyy-MM-dd', new Date()), currentTimezone));
                       setDatePickerVisible(false);
                     }}
                   >
@@ -879,23 +878,23 @@ export default function DailyScreen() {
                 <View style={styles.eventModalTimeRow}>
                   <Text style={styles.eventModalTimeLabel}>Date:</Text>
                   <Text style={styles.eventModalTime}>
-                    {dayjs(selectedEvent.start).utc().tz(currentTimezone).format('ddd, MMM D, YYYY')}
+                    {format(toZonedTime(new Date(selectedEvent.start), currentTimezone), 'EEE, MMM d, yyyy')}
                   </Text>
                 </View>
                 <View style={styles.eventModalTimeRow}>
                   <Text style={styles.eventModalTimeLabel}>Time:</Text>
                   <Text style={styles.eventModalTime}>
-                    {dayjs(selectedEvent.start).utc().tz(currentTimezone).format('h:mm A')} -{' '}
-                    {dayjs(selectedEvent.end).utc().tz(currentTimezone).format('h:mm A')}
+                    {format(toZonedTime(new Date(selectedEvent.start), currentTimezone), 'h:mm a')} -{' '}
+                    {format(toZonedTime(new Date(selectedEvent.end), currentTimezone), 'h:mm a')}
                   </Text>
                 </View>
                 <View style={styles.eventModalTimeRow}>
                   <Text style={styles.eventModalTimeLabel}>Duration:</Text>
                   <Text style={styles.eventModalTime}>
                     {(() => {
-                      const duration = dayjs(selectedEvent.end).utc().tz(currentTimezone).diff(
-                        dayjs(selectedEvent.start).utc().tz(currentTimezone),
-                        'minute'
+                      const duration = differenceInMinutes(
+                        toZonedTime(new Date(selectedEvent.end), currentTimezone),
+                        toZonedTime(new Date(selectedEvent.start), currentTimezone)
                       );
                       if (duration < 60) return `${duration}m`;
                       const hours = Math.floor(duration / 60);

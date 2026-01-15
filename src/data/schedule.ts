@@ -1,11 +1,7 @@
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
-import timezone from 'dayjs/plugin/timezone';
+import { parse, startOfDay, endOfDay, isValid, isBefore, isSameSecond } from 'date-fns';
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { supabase } from '../lib/supabase';
 import { WeeklyHours, Event } from '../types';
-
-dayjs.extend(utc);
-dayjs.extend(timezone);
 
 /**
  * Gets weekly hours for a specific user
@@ -74,13 +70,13 @@ export async function getEventsForDate(
 ): Promise<Event[]> {
   try {
     // Parse the date in the target timezone
-    const localDate = dayjs.tz(dateISO, tz);
-    const dayStart = localDate.startOf('day');
-    const dayEnd = localDate.endOf('day');
+    const localDate = toZonedTime(parse(dateISO, 'yyyy-MM-dd', new Date()), tz);
+    const dayStart = startOfDay(localDate);
+    const dayEnd = endOfDay(localDate);
 
     // Convert to UTC for database query
-    const dayStartUTC = dayStart.utc().toISOString();
-    const dayEndUTC = dayEnd.utc().toISOString();
+    const dayStartUTC = fromZonedTime(dayStart, tz).toISOString();
+    const dayEndUTC = fromZonedTime(dayEnd, tz).toISOString();
 
     // Query events that overlap with the day
     // An event overlaps if:
@@ -191,14 +187,14 @@ export async function createEvent(
     }
 
     // Validate dates
-    const startDate = dayjs(payload.start);
-    const endDate = dayjs(payload.end);
+    const startDate = new Date(payload.start);
+    const endDate = new Date(payload.end);
 
-    if (!startDate.isValid() || !endDate.isValid()) {
+    if (!isValid(startDate) || !isValid(endDate)) {
       throw new Error('Invalid date format. Use ISO 8601 format.');
     }
 
-    if (endDate.isBefore(startDate) || endDate.isSame(startDate)) {
+    if (isBefore(endDate, startDate) || isSameSecond(endDate, startDate)) {
       throw new Error('End date must be after start date');
     }
 
@@ -250,15 +246,15 @@ export async function updateEvent(
 
     // Validate dates if provided
     if (payload.start || payload.end) {
-      const startDate = payload.start ? dayjs(payload.start) : null;
-      const endDate = payload.end ? dayjs(payload.end) : null;
+      const startDate = payload.start ? new Date(payload.start) : null;
+      const endDate = payload.end ? new Date(payload.end) : null;
 
       // If both are provided, validate them together
       if (startDate && endDate) {
-        if (!startDate.isValid() || !endDate.isValid()) {
+        if (!isValid(startDate) || !isValid(endDate)) {
           throw new Error('Invalid date format. Use ISO 8601 format.');
         }
-        if (endDate.isBefore(startDate) || endDate.isSame(startDate)) {
+        if (isBefore(endDate, startDate) || isSameSecond(endDate, startDate)) {
           throw new Error('End date must be after start date');
         }
       }

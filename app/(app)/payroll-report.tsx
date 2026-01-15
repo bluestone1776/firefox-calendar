@@ -10,9 +10,7 @@ import {
   FlatList,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
-import timezone from 'dayjs/plugin/timezone';
+import { format, parse, startOfWeek, endOfWeek, addDays, subDays, getDay } from 'date-fns';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { useAuth } from '../../src/hooks/useAuth';
@@ -24,9 +22,6 @@ import {
 import { Profile, PayrollConfirmation } from '../../src/types';
 import { Button } from '../../src/components/ui/Button';
 import { getTimezone, getDefaultTimezone } from '../../src/utils/timezone';
-
-dayjs.extend(utc);
-dayjs.extend(timezone);
 
 type ReportRow = {
   profile: Profile;
@@ -50,13 +45,14 @@ export default function PayrollReportScreen() {
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState(() => {
     // Default to start of current week (Monday)
-    const today = dayjs();
-    return today.startOf('week').add(1, 'day');
+    const today = new Date();
+    const weekStart = startOfWeek(today, { weekStartsOn: 1 }); // Monday
+    return weekStart;
   });
   const [endDate, setEndDate] = useState(() => {
     // Default to end of current week (Sunday)
-    const today = dayjs();
-    return today.endOf('week');
+    const today = new Date();
+    return endOfWeek(today, { weekStartsOn: 1 });
   });
   const [reportData, setReportData] = useState<ReportRow[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -101,8 +97,8 @@ export default function PayrollReportScreen() {
   const loadReportData = async () => {
     setLoading(true);
     try {
-      const startISO = startDate.format('YYYY-MM-DD');
-      const endISO = endDate.format('YYYY-MM-DD');
+      const startISO = format(startDate, 'yyyy-MM-dd');
+      const endISO = format(endDate, 'yyyy-MM-dd');
 
       const confirmations = await getAllPayrollConfirmationsForRange(startISO, endISO);
 
@@ -142,14 +138,14 @@ export default function PayrollReportScreen() {
     const summaries = new Map<string, WeeklySummary>();
 
     reportData.forEach((row) => {
-      const date = dayjs(row.date);
-      const weekStart = date.startOf('week').add(1, 'day'); // Monday
-      const weekKey = `${row.profile.id}-${weekStart.format('YYYY-MM-DD')}`;
+      const date = parse(row.date, 'yyyy-MM-dd', new Date());
+      const weekStart = startOfWeek(date, { weekStartsOn: 1 }); // Monday
+      const weekKey = `${row.profile.id}-${format(weekStart, 'yyyy-MM-dd')}`;
 
       if (!summaries.has(weekKey)) {
         summaries.set(weekKey, {
           profile: row.profile,
-          weekStart: weekStart.format('YYYY-MM-DD'),
+          weekStart: format(weekStart, 'yyyy-MM-dd'),
           totalHours: 0,
           daysConfirmed: 0,
           days: [],
@@ -175,12 +171,12 @@ export default function PayrollReportScreen() {
 
     if (viewMode === 'daily') {
       reportData.forEach((row) => {
-        const date = dayjs(row.date).format('YYYY-MM-DD');
+        const date = format(parse(row.date, 'yyyy-MM-dd', new Date()), 'yyyy-MM-dd');
         const name = row.profile.name || row.profile.email.split('@')[0];
         const hours = row.hours.toFixed(2);
         const notes = (row.notes || '').replace(/"/g, '""');
         const confirmedAt = row.confirmedAt
-          ? dayjs(row.confirmedAt).format('YYYY-MM-DD HH:mm:ss')
+          ? format(new Date(row.confirmedAt), 'yyyy-MM-dd HH:mm:ss')
           : '';
         csv += `"${date}","${row.profile.email}","${name}","${hours}","${notes}","${confirmedAt}"\n`;
       });
@@ -188,7 +184,7 @@ export default function PayrollReportScreen() {
       // Weekly summary
       csv = 'Week Start,Employee Email,Employee Name,Total Hours,Days Confirmed\n';
       getWeeklySummaries().forEach((summary) => {
-        const weekStart = dayjs(summary.weekStart).format('YYYY-MM-DD');
+        const weekStart = format(parse(summary.weekStart, 'yyyy-MM-dd', new Date()), 'yyyy-MM-dd');
         const name = summary.profile.name || summary.profile.email.split('@')[0];
         const totalHours = summary.totalHours.toFixed(2);
         csv += `"${weekStart}","${summary.profile.email}","${name}","${totalHours}","${summary.daysConfirmed}"\n`;
@@ -201,7 +197,7 @@ export default function PayrollReportScreen() {
   const handleExportCSV = async () => {
     try {
       const csv = generateCSV();
-      const fileName = `payroll-report-${startDate.format('YYYY-MM-DD')}-to-${endDate.format('YYYY-MM-DD')}.csv`;
+      const fileName = `payroll-report-${format(startDate, 'yyyy-MM-dd')}-to-${format(endDate, 'yyyy-MM-dd')}.csv`;
       const fileUri = `${FileSystem.documentDirectory}${fileName}`;
 
       await FileSystem.writeAsStringAsync(fileUri, csv, {
@@ -225,18 +221,18 @@ export default function PayrollReportScreen() {
 
   const navigateWeek = (direction: 'prev' | 'next') => {
     if (direction === 'prev') {
-      setStartDate(startDate.subtract(7, 'day'));
-      setEndDate(endDate.subtract(7, 'day'));
+      setStartDate(subDays(startDate, 7));
+      setEndDate(subDays(endDate, 7));
     } else {
-      setStartDate(startDate.add(7, 'day'));
-      setEndDate(endDate.add(7, 'day'));
+      setStartDate(addDays(startDate, 7));
+      setEndDate(addDays(endDate, 7));
     }
   };
 
   const goToCurrentWeek = () => {
-    const today = dayjs();
-    setStartDate(today.startOf('week').add(1, 'day'));
-    setEndDate(today.endOf('week'));
+    const today = new Date();
+    setStartDate(startOfWeek(today, { weekStartsOn: 1 }));
+    setEndDate(endOfWeek(today, { weekStartsOn: 1 }));
   };
 
   const totalHours = reportData.reduce((sum, row) => sum + row.hours, 0);
@@ -288,7 +284,7 @@ export default function PayrollReportScreen() {
               <Text style={styles.navButtonText}>←</Text>
             </TouchableOpacity>
             <Text style={styles.dateRangeText}>
-              {startDate.format('MMM D')} - {endDate.format('MMM D, YYYY')}
+              {format(startDate, 'MMM d')} - {format(endDate, 'MMM d, yyyy')}
             </Text>
             <TouchableOpacity onPress={() => navigateWeek('next')} style={styles.navButton}>
               <Text style={styles.navButtonText}>→</Text>
@@ -322,7 +318,7 @@ export default function PayrollReportScreen() {
             reportData.map((row, index) => (
               <View key={`${row.profile.id}-${row.date}-${index}`} style={styles.tableRow}>
                 <Text style={[styles.tableCell, styles.dateCell]}>
-                  {dayjs(row.date).format('MMM D')}
+                  {format(parse(row.date, 'yyyy-MM-dd', new Date()), 'MMM d')}
                 </Text>
                 <Text style={[styles.tableCell, styles.nameCell]} numberOfLines={1}>
                   {row.profile.name || row.profile.email.split('@')[0]}
@@ -349,7 +345,7 @@ export default function PayrollReportScreen() {
                       {summary.profile.name || summary.profile.email.split('@')[0]}
                     </Text>
                     <Text style={styles.weeklyDate}>
-                      Week of {dayjs(summary.weekStart).format('MMM D, YYYY')}
+                      Week of {format(parse(summary.weekStart, 'yyyy-MM-dd', new Date()), 'MMM d, yyyy')}
                     </Text>
                   </View>
                   <View style={styles.weeklyStats}>

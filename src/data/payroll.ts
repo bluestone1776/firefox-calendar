@@ -1,11 +1,6 @@
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
-import timezone from 'dayjs/plugin/timezone';
+import { format, parse, addDays, isValid } from 'date-fns';
 import { supabase } from '../lib/supabase';
 import { PayrollConfirmation } from '../types';
-
-dayjs.extend(utc);
-dayjs.extend(timezone);
 
 /**
  * Gets payroll confirmation for a specific user and date
@@ -82,9 +77,9 @@ export async function getPayrollConfirmationsForWeek(
   weekStartDateISO: string
 ): Promise<PayrollConfirmation[]> {
   try {
-    const weekStart = dayjs(weekStartDateISO);
-    const weekEnd = weekStart.add(6, 'days');
-    const weekEndISO = weekEnd.format('YYYY-MM-DD');
+    const weekStart = parse(weekStartDateISO, 'yyyy-MM-dd', new Date());
+    const weekEnd = addDays(weekStart, 6);
+    const weekEndISO = format(weekEnd, 'yyyy-MM-dd');
 
     return await getPayrollConfirmationsForRange(userId, weekStartDateISO, weekEndISO);
   } catch (error) {
@@ -141,8 +136,8 @@ export async function upsertPayrollConfirmation(
     }
 
     // Validate date format
-    const date = dayjs(payload.date);
-    if (!date.isValid()) {
+    const date = parse(payload.date, 'yyyy-MM-dd', new Date());
+    if (!isValid(date)) {
       throw new Error('Invalid date format. Use YYYY-MM-DD format.');
     }
 

@@ -8,7 +8,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import dayjs from 'dayjs';
+import { format } from 'date-fns';
 import { useAuth } from '../../hooks/useAuth';
 import {
   getPayrollConfirmation,
@@ -18,7 +18,7 @@ import {
 import { PayrollConfirmation as PayrollConfirmationType } from '../../types';
 
 interface DailyConfirmationProps {
-  date: dayjs.Dayjs;
+  date: Date;
   expectedHours?: number; // Optional: calculated expected hours based on schedule
   onConfirmationChange?: () => void;
 }
@@ -36,7 +36,7 @@ export function DailyConfirmation({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const dateISO = date.format('YYYY-MM-DD');
+  const dateISO = format(date, 'yyyy-MM-dd');
 
   useEffect(() => {
     if (user?.id) {

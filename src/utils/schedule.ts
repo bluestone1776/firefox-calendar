@@ -1,10 +1,6 @@
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
-import timezone from 'dayjs/plugin/timezone';
+import { format, parse, getHours, getMinutes, getDay, isAfter, isBefore, differenceInMilliseconds, addMinutes } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
 import { WeeklyHours, Event, Profile } from '../types';
-
-dayjs.extend(utc);
-dayjs.extend(timezone);
 
 export type UserStatus = 'working' | 'busy' | 'off';
 
@@ -24,13 +20,13 @@ export interface StatusInfo {
  */
 export function computeStatusForUserAtTime(
   userId: string,
-  dateTime: dayjs.Dayjs,
+  dateTime: Date,
   tz: string,
   weeklyHours?: WeeklyHours,
   events: Event[] = []
 ): StatusInfo {
-  const hour = dateTime.hour();
-  const minute = dateTime.minute();
+  const hour = getHours(dateTime);
+  const minute = getMinutes(dateTime);
   const timeInMinutes = hour * 60 + minute;
 
   // Check if user has a shift today
@@ -45,9 +41,9 @@ export function computeStatusForUserAtTime(
 
   // Check if user has an event at this time
   const currentEvent = events.find((event) => {
-    const eventStart = dayjs(event.start).utc().tz(tz);
-    const eventEnd = dayjs(event.end).utc().tz(tz);
-    return dateTime.isAfter(eventStart) && dateTime.isBefore(eventEnd);
+    const eventStart = toZonedTime(new Date(event.start), tz);
+    const eventEnd = toZonedTime(new Date(event.end), tz);
+    return isAfter(dateTime, eventStart) && isBefore(dateTime, eventEnd);
   });
 
   // Determine status
@@ -80,37 +76,31 @@ export function computeStatusForUserAtTime(
  * @param tz - Timezone string
  */
 export function computeNextChangeAcrossStaff(
-  selectedDate: dayjs.Dayjs,
+  selectedDate: Date,
   allWeeklyHours: Map<string, WeeklyHours>,
   allEvents: Map<string, Event[]>,
   tz: string
-): dayjs.Dayjs | null {
-  const now = dayjs.tz(undefined, tz);
-  const checkDate = selectedDate.format('YYYY-MM-DD');
-  const changeTimes: dayjs.Dayjs[] = [];
+): Date | null {
+  const now = toZonedTime(new Date(), tz);
+  const checkDate = format(selectedDate, 'yyyy-MM-dd');
+  const changeTimes: Date[] = [];
 
   // Collect all shift start/end times
   allWeeklyHours.forEach((hours) => {
-    const shiftStart = dayjs.tz(
-      `${checkDate} ${hours.start_hour}:${hours.start_minute}`,
-      tz
-    );
-    const shiftEnd = dayjs.tz(
-      `${checkDate} ${hours.end_hour}:${hours.end_minute}`,
-      tz
-    );
+    const shiftStart = toZonedTime(parse(`${checkDate} ${hours.start_hour}:${hours.start_minute}`, 'yyyy-MM-dd H:mm', new Date()), tz);
+    const shiftEnd = toZonedTime(parse(`${checkDate} ${hours.end_hour}:${hours.end_minute}`, 'yyyy-MM-dd H:mm', new Date()), tz);
     changeTimes.push(shiftStart, shiftEnd);
   });
 
   // Collect all event start/end times
   allEvents.forEach((events) => {
     events.forEach((event) => {
-      const eventStart = dayjs(event.start).utc().tz(tz);
-      const eventEnd = dayjs(event.end).utc().tz(tz);
-      if (eventStart.format('YYYY-MM-DD') === checkDate) {
+      const eventStart = toZonedTime(new Date(event.start), tz);
+      const eventEnd = toZonedTime(new Date(event.end), tz);
+      if (format(eventStart, 'yyyy-MM-dd') === checkDate) {
         changeTimes.push(eventStart);
       }
-      if (eventEnd.format('YYYY-MM-DD') === checkDate) {
+      if (format(eventEnd, 'yyyy-MM-dd') === checkDate) {
         changeTimes.push(eventEnd);
       }
     });
@@ -118,8 +108,8 @@ export function computeNextChangeAcrossStaff(
 
   // Filter to future times and find the earliest
   const futureChanges = changeTimes
-    .filter((time) => time.isAfter(now))
-    .sort((a, b) => a.diff(b));
+    .filter((time) => isAfter(time, now))
+    .sort((a, b) => differenceInMilliseconds(a, b));
 
   return futureChanges.length > 0 ? futureChanges[0] : null;
 }
@@ -133,13 +123,13 @@ export function computeNextChangeAcrossStaff(
  * @param paddingMinutes - Padding to add before/after (default 60)
  */
 export function computeAutoDayRangeFromShifts(
-  selectedDate: dayjs.Dayjs,
+  selectedDate: Date,
   allWeeklyHours: Map<string, WeeklyHours>,
   tz: string,
   paddingMinutes: number = 60,
   allEvents?: Map<string, Event[]>
 ): { startHour: number; endHour: number } {
-  const checkDate = selectedDate.format('YYYY-MM-DD');
+  const checkDate = format(selectedDate, 'yyyy-MM-dd');
   let earliestStart = 23;
   let latestEnd = 0;
   let hasAnyData = false;
@@ -162,13 +152,13 @@ export function computeAutoDayRangeFromShifts(
   if (allEvents) {
     allEvents.forEach((events) => {
       events.forEach((event) => {
-        const eventStart = dayjs(event.start).utc().tz(tz);
-        const eventEnd = dayjs(event.end).utc().tz(tz);
+        const eventStart = toZonedTime(new Date(event.start), tz);
+        const eventEnd = toZonedTime(new Date(event.end), tz);
         
-        if (eventStart.format('YYYY-MM-DD') === checkDate) {
+        if (format(eventStart, 'yyyy-MM-dd') === checkDate) {
           hasAnyData = true;
-          const startHour = eventStart.hour() + eventStart.minute() / 60;
-          const endHour = eventEnd.hour() + eventEnd.minute() / 60;
+          const startHour = getHours(eventStart) + getMinutes(eventStart) / 60;
+          const endHour = getHours(eventEnd) + getMinutes(eventEnd) / 60;
           
           if (startHour < earliestStart) {
             earliestStart = startHour;
@@ -211,21 +201,18 @@ export function computeAutoDayRangeFromShifts(
  */
 export function getNextBlockForUser(
   userId: string,
-  currentTime: dayjs.Dayjs,
+  currentTime: Date,
   tz: string,
   weeklyHours?: WeeklyHours,
   events: Event[] = []
-): { title: string; time: dayjs.Dayjs } | null {
-  const checkDate = currentTime.format('YYYY-MM-DD');
-  const blocks: { title: string; time: dayjs.Dayjs; type: 'event' | 'shift' }[] = [];
+): { title: string; time: Date } | null {
+  const checkDate = format(currentTime, 'yyyy-MM-dd');
+  const blocks: { title: string; time: Date; type: 'event' | 'shift' }[] = [];
 
   // Add shift start if it's in the future
   if (weeklyHours) {
-    const shiftStart = dayjs.tz(
-      `${checkDate} ${weeklyHours.start_hour}:${weeklyHours.start_minute}`,
-      tz
-    );
-    if (shiftStart.isAfter(currentTime)) {
+    const shiftStart = toZonedTime(parse(`${checkDate} ${weeklyHours.start_hour}:${weeklyHours.start_minute}`, 'yyyy-MM-dd H:mm', new Date()), tz);
+    if (isAfter(shiftStart, currentTime)) {
       blocks.push({
         title: 'Shift starts',
         time: shiftStart,
@@ -236,8 +223,8 @@ export function getNextBlockForUser(
 
   // Add upcoming events
   events.forEach((event) => {
-    const eventStart = dayjs(event.start).utc().tz(tz);
-    if (eventStart.isAfter(currentTime) && eventStart.format('YYYY-MM-DD') === checkDate) {
+    const eventStart = toZonedTime(new Date(event.start), tz);
+    if (isAfter(eventStart, currentTime) && format(eventStart, 'yyyy-MM-dd') === checkDate) {
       blocks.push({
         title: event.title,
         time: eventStart,
@@ -247,7 +234,7 @@ export function getNextBlockForUser(
   });
 
   // Sort by time and return the earliest
-  blocks.sort((a, b) => a.time.diff(b.time));
+  blocks.sort((a, b) => differenceInMilliseconds(a.time, b.time));
   return blocks.length > 0 ? { title: blocks[0].title, time: blocks[0].time } : null;
 }
 
@@ -262,19 +249,19 @@ export function hasEventConflict(
   allEvents: Event[],
   tz: string
 ): boolean {
-  const eventStart = dayjs(event.start).utc().tz(tz);
-  const eventEnd = dayjs(event.end).utc().tz(tz);
+  const eventStart = toZonedTime(new Date(event.start), tz);
+  const eventEnd = toZonedTime(new Date(event.end), tz);
 
   return allEvents.some((otherEvent) => {
     if (otherEvent.id === event.id) return false; // Don't conflict with itself
 
-    const otherStart = dayjs(otherEvent.start).utc().tz(tz);
-    const otherEnd = dayjs(otherEvent.end).utc().tz(tz);
+    const otherStart = toZonedTime(new Date(otherEvent.start), tz);
+    const otherEnd = toZonedTime(new Date(otherEvent.end), tz);
 
     // Events conflict if they overlap
     return (
-      (eventStart.isBefore(otherEnd) && eventEnd.isAfter(otherStart)) ||
-      (otherStart.isBefore(eventEnd) && otherEnd.isAfter(eventStart))
+      (isBefore(eventStart, otherEnd) && isAfter(eventEnd, otherStart)) ||
+      (isBefore(otherStart, eventEnd) && isAfter(otherEnd, eventStart))
     );
   });
 }

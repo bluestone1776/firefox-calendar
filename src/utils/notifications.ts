@@ -1,12 +1,7 @@
 // DISABLED: Notifications not working with Expo Go
 // import * as Notifications from 'expo-notifications';
 // import { Platform } from 'react-native';
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
-import timezone from 'dayjs/plugin/timezone';
-
-dayjs.extend(utc);
-dayjs.extend(timezone);
+// date-fns-tz is now used instead of dayjs (when notifications are re-enabled)
 
 // DISABLED: Notifications not working with Expo Go
 // Configure notification handler (with error handling for Expo Go)

@@ -12,9 +12,8 @@ import {
   Switch,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
-import timezone from 'dayjs/plugin/timezone';
+import { format, parse, getHours, getMinutes, addDays } from 'date-fns';
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { useAuth } from '../../src/hooks/useAuth';
 import { listProfiles } from '../../src/data/profiles';
 import { createEvent, updateEvent } from '../../src/data/schedule';
@@ -24,9 +23,6 @@ import { Input } from '../../src/components/ui/Input';
 import { Button } from '../../src/components/ui/Button';
 import { supabase } from '../../src/lib/supabase';
 import { getTimezone, getDefaultTimezone } from '../../src/utils/timezone';
-
-dayjs.extend(utc);
-dayjs.extend(timezone);
 
 const DEFAULT_TZ = process.env.EXPO_PUBLIC_DEFAULT_TZ || 'Australia/Sydney';
 
@@ -80,7 +76,7 @@ export default function EventEditorScreen() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [date, setDate] = useState(
-    params.date || dayjs.tz(undefined, getDefaultTimezone()).format('YYYY-MM-DD')
+    params.date || format(toZonedTime(new Date(), getDefaultTimezone()), 'yyyy-MM-dd')
   );
   const [startHour, setStartHour] = useState(
     params.startHour ? parseInt(params.startHour) : 9
@@ -171,24 +167,24 @@ export default function EventEditorScreen() {
 
       const event = data as Event;
       const tz = await getTimezone();
-      const startTime = dayjs(event.start).utc().tz(tz);
-      const endTime = dayjs(event.end).utc().tz(tz);
+      const startTime = toZonedTime(new Date(event.start), tz);
+      const endTime = toZonedTime(new Date(event.end), tz);
 
       setSelectedUserId(event.profile_id);
-      setDate(startTime.format('YYYY-MM-DD'));
-      setStartHour(startTime.hour());
-      setStartMinute(startTime.minute());
-      setEndHour(endTime.hour());
-      setEndMinute(endTime.minute());
+      setDate(format(startTime, 'yyyy-MM-dd'));
+      setStartHour(getHours(startTime));
+      setStartMinute(getMinutes(startTime));
+      setEndHour(getHours(endTime));
+      setEndMinute(getMinutes(endTime));
       setType(event.type);
       setTitle(event.title);
 
       // Check if all-day (spans full day)
       const isFullDay =
-        startTime.hour() === 0 &&
-        startTime.minute() === 0 &&
-        endTime.hour() === 23 &&
-        endTime.minute() === 59;
+        getHours(startTime) === 0 &&
+        getMinutes(startTime) === 0 &&
+        getHours(endTime) === 23 &&
+        getMinutes(endTime) === 59;
       setIsAllDay(isFullDay && event.type === 'leave');
     } catch (error: any) {
       console.error('Error loading event:', error);
@@ -229,10 +225,10 @@ export default function EventEditorScreen() {
       if (isAllDay && type === 'leave') {
         // All-day leave: 00:00 to 23:59 in the selected timezone
         // Use format to ensure correct timezone interpretation
-        const startDate = dayjs.tz(`${date} 00:00:00`, currentTimezone);
-        const endDate = dayjs.tz(`${date} 23:59:59`, currentTimezone);
-        startDateTime = startDate.toISOString();
-        endDateTime = endDate.toISOString();
+        const startDate = toZonedTime(parse(`${date} 00:00:00`, 'yyyy-MM-dd HH:mm:ss', new Date()), currentTimezone);
+        const endDate = toZonedTime(parse(`${date} 23:59:59`, 'yyyy-MM-dd HH:mm:ss', new Date()), currentTimezone);
+        startDateTime = fromZonedTime(startDate, currentTimezone).toISOString();
+        endDateTime = fromZonedTime(endDate, currentTimezone).toISOString();
       } else {
         // Validate end > start
         const startTotal = startHour * 60 + startMinute;
@@ -244,16 +240,16 @@ export default function EventEditorScreen() {
           return;
         }
 
-        // Create date-time string in format "YYYY-MM-DD HH:mm:ss" and parse in timezone
+        // Create date-time string in format "yyyy-MM-dd HH:mm:ss" and parse in timezone
         // This ensures the time is interpreted in the correct timezone
         const startTimeStr = `${date} ${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}:00`;
         const endTimeStr = `${date} ${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}:00`;
         
-        const startDate = dayjs.tz(startTimeStr, 'YYYY-MM-DD HH:mm:ss', currentTimezone);
-        const endDate = dayjs.tz(endTimeStr, 'YYYY-MM-DD HH:mm:ss', currentTimezone);
+        const startDate = toZonedTime(parse(startTimeStr, 'yyyy-MM-dd HH:mm:ss', new Date()), currentTimezone);
+        const endDate = toZonedTime(parse(endTimeStr, 'yyyy-MM-dd HH:mm:ss', new Date()), currentTimezone);
         
-        startDateTime = startDate.toISOString();
-        endDateTime = endDate.toISOString();
+        startDateTime = fromZonedTime(startDate, currentTimezone).toISOString();
+        endDateTime = fromZonedTime(endDate, currentTimezone).toISOString();
       }
 
       if (params.eventId) {
@@ -303,12 +299,12 @@ export default function EventEditorScreen() {
   // Generate date options (today ± 60 days)
   const generateDateOptions = () => {
     const options: { value: string; display: string }[] = [];
-    const today = dayjs.tz(undefined, currentTimezone);
+    const today = toZonedTime(new Date(), currentTimezone);
     for (let i = -60; i <= 60; i++) {
-      const d = today.add(i, 'day');
+      const d = addDays(today, i);
       options.push({
-        value: d.format('YYYY-MM-DD'),
-        display: d.format('ddd, MMM D, YYYY'),
+        value: format(d, 'yyyy-MM-dd'),
+        display: format(d, 'EEE, MMM d, yyyy'),
       });
     }
     return options;
@@ -357,7 +353,7 @@ export default function EventEditorScreen() {
             onPress={() => setDatePickerModal(true)}
           >
             <Text style={styles.pickerButtonText}>
-              {dayjs.tz(date, currentTimezone).format('ddd, MMM D, YYYY')}
+              {format(toZonedTime(parse(date, 'yyyy-MM-dd', new Date()), currentTimezone), 'EEE, MMM d, yyyy')}
             </Text>
           </TouchableOpacity>
         </View>

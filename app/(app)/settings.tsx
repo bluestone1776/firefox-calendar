@@ -201,6 +201,15 @@ export default function SettingsScreen() {
         </View>
       </View> */}
 
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Schedule</Text>
+        <Button
+          title="Weekly Confirmation"
+          onPress={() => router.push('/(app)/weekly-confirmation')}
+          style={styles.adminButton}
+        />
+      </View>
+
       {isAdmin && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Admin Tools</Text>

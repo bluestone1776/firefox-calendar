@@ -8,7 +8,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { format } from 'date-fns';
+import { format, isSameDay } from 'date-fns';
 import { useAuth } from '../../hooks/useAuth';
 import {
   getPayrollConfirmation,
@@ -148,13 +148,13 @@ export function DailyConfirmation({
     );
   }
 
-  const isToday = date.isSame(dayjs(), 'day');
+  const isToday = isSameDay(date, new Date());
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>
-          {isToday ? 'Confirm Hours Worked Today' : `Confirm Hours for ${date.format('MMM D')}`}
+          {isToday ? 'Confirm Hours Worked Today' : `Confirm Hours for ${format(date, 'MMM d')}`}
         </Text>
         <TouchableOpacity
           style={[styles.checkbox, isConfirmed && styles.checkboxChecked]}

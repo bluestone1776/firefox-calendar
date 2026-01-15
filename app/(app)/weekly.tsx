@@ -16,6 +16,7 @@ import {
   getWeeklyHoursForUser,
   upsertWeeklyHours,
 } from '../../src/data/schedule';
+import { getTimezone, getDefaultTimezone } from '../../src/utils/timezone';
 import { Profile, WeeklyHours } from '../../src/types';
 import { TIME_BLOCK_MINUTES, DAY_START_HOUR, DAY_END_HOUR } from '../../src/constants/time';
 import { Button } from '../../src/components/ui/Button';
@@ -120,7 +121,10 @@ export default function WeeklyScreen() {
   const loadHours = async (userId: string) => {
     setLoading(true);
     try {
-      const existingHours = await getWeeklyHoursForUser(userId);
+      // Load timezone
+      const timezone = await getTimezone().catch(() => getDefaultTimezone());
+      // Load weekly hours (convert from UTC to user's timezone)
+      const existingHours = await getWeeklyHoursForUser(userId, timezone);
       const newHours: Record<number, DayHours> = {
         0: { enabled: false, startHour: 9, startMinute: 0, endHour: 17, endMinute: 0 },
         1: { enabled: false, startHour: 9, startMinute: 0, endHour: 17, endMinute: 0 },

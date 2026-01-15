@@ -71,6 +71,7 @@ export default function EventEditorScreen() {
     startMinute?: string;
     endHour?: string;
     endMinute?: string;
+    dayOfWeek?: string; // For editing weekly schedules: 0 = Sunday, 1 = Monday, etc.
   }>();
   const { user, isAdmin, profile } = useAuth();
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -90,9 +91,14 @@ export default function EventEditorScreen() {
   const [endMinute, setEndMinute] = useState(
     params.endMinute ? parseInt(params.endMinute) : 30
   );
-  const [type, setType] = useState<'meeting' | 'personal' | 'leave'>('meeting');
+  const [type, setType] = useState<'meeting' | 'personal' | 'leave' | 'working_hours'>('meeting');
   const [title, setTitle] = useState('');
   const [isAllDay, setIsAllDay] = useState(false);
+  // If dayOfWeek is provided, we're editing a weekly schedule - enable recurring by default
+  const [isRecurring, setIsRecurring] = useState(params.dayOfWeek !== undefined);
+  const [recurringDays, setRecurringDays] = useState<Set<number>>(
+    params.dayOfWeek !== undefined ? new Set([parseInt(params.dayOfWeek)]) : new Set()
+  );
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [timePickerModal, setTimePickerModal] = useState<{
@@ -207,13 +213,130 @@ export default function EventEditorScreen() {
 
   const handleSave = async () => {
     // Validation
-    if (!isAllDay && !title.trim()) {
-      Alert.alert('Error', 'Title is required');
+    if (!selectedUserId) {
+      Alert.alert('Error', 'Please select a user');
       return;
     }
 
-    if (!selectedUserId) {
-      Alert.alert('Error', 'Please select a user');
+    if (isRecurring) {
+      // Validate recurring schedule
+      if (recurringDays.size === 0) {
+        Alert.alert('Error', 'Please select at least one day of the week');
+        return;
+      }
+
+      const startTotal = startHour * 60 + startMinute;
+      const endTotal = endHour * 60 + endMinute;
+
+      if (endTotal <= startTotal) {
+        Alert.alert('Error', 'End time must be after start time');
+        return;
+      }
+
+      setSaving(true);
+      try {
+        // Helper: Convert a time in target timezone to UTC (same as regular events)
+        const timeInTimezoneToUTC = (y: number, m: number, d: number, h: number, min: number, sec: number, tz: string): string => {
+          // Start with a UTC date using our components
+          let testUTC = new Date(Date.UTC(y, m - 1, d, h, min, sec));
+          
+          // Check what time this UTC date represents in the target timezone
+          const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: tz,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+          });
+          
+          let parts = formatter.formatToParts(testUTC);
+          let targetHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
+          let targetMinute = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
+          
+          // Calculate adjustment needed
+          const desiredMinutes = h * 60 + min;
+          const actualMinutes = targetHour * 60 + targetMinute;
+          let diffMinutes = desiredMinutes - actualMinutes;
+          
+          // Adjust and verify (handle day boundaries)
+          testUTC = new Date(testUTC.getTime() + diffMinutes * 60000);
+          
+          // Verify the result
+          parts = formatter.formatToParts(testUTC);
+          targetHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
+          targetMinute = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
+          
+          // If still not correct, adjust again (handles edge cases)
+          const finalDiff = (h * 60 + min) - (targetHour * 60 + targetMinute);
+          if (finalDiff !== 0) {
+            testUTC = new Date(testUTC.getTime() + finalDiff * 60000);
+          }
+          
+          // Return as UTC ISO string (pure UTC, no timezone offset in the string)
+          return testUTC.toISOString();
+        };
+
+        // Save as unified events (working_hours type) for selected days
+        // Use a reference date (2024-01-01) for the time components
+        // Convert times from user's timezone to UTC
+        const referenceYear = 2024;
+        const referenceMonth = 1;
+        const referenceDay = 1;
+        
+        const startDateTime = timeInTimezoneToUTC(referenceYear, referenceMonth, referenceDay, startHour, startMinute, 0, currentTimezone);
+        const endDateTime = timeInTimezoneToUTC(referenceYear, referenceMonth, referenceDay, endHour, endMinute, 0, currentTimezone);
+
+        // Delete existing working_hours events for this user first
+        const { data: existingEvents } = await supabase
+          .from('events')
+          .select('id')
+          .eq('profile_id', selectedUserId)
+          .eq('is_recurring', true)
+          .eq('type', 'working_hours');
+
+        if (existingEvents && existingEvents.length > 0) {
+          const idsToDelete = existingEvents.map(e => e.id);
+          await supabase
+            .from('events')
+            .delete()
+            .in('id', idsToDelete);
+        }
+
+        // Create new events for each selected day
+        const eventsToCreate = Array.from(recurringDays).map((dayOfWeek) => ({
+          profile_id: selectedUserId,
+          title: title.trim() || 'Working Hours',
+          start: startDateTime, // Already an ISO string from timeInTimezoneToUTC
+          end: endDateTime, // Already an ISO string from timeInTimezoneToUTC
+          type: 'working_hours' as const,
+          is_recurring: true,
+          day_of_week: dayOfWeek,
+          recurrence_pattern: [dayOfWeek],
+          created_by: user?.id,
+        }));
+
+        // Create all events
+        for (const eventData of eventsToCreate) {
+          await createEvent(eventData, user?.id);
+        }
+
+        Alert.alert('Success', `Weekly schedule saved for ${recurringDays.size} day(s)`);
+        router.replace('/(app)/daily');
+      } catch (error: any) {
+        console.error('Error saving weekly schedule:', error);
+        Alert.alert('Error', error.message || 'Failed to save weekly schedule');
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    // Regular event validation
+    if (!isAllDay && !title.trim()) {
+      Alert.alert('Error', 'Title is required');
       return;
     }
 
@@ -394,21 +517,93 @@ export default function EventEditorScreen() {
           </View>
         )}
 
-        {/* Date picker */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Date *</Text>
-          <TouchableOpacity
-            style={styles.pickerButton}
-            onPress={() => setDatePickerModal(true)}
-          >
-            <Text style={styles.pickerButtonText}>
-              {format(toZonedTime(parse(date, 'yyyy-MM-dd', new Date()), currentTimezone), 'EEE, MMM d, yyyy')}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        {/* Date picker (only for one-time events) */}
+        {!isRecurring && (
+          <View style={styles.field}>
+            <Text style={styles.label}>Date *</Text>
+            <TouchableOpacity
+              style={styles.pickerButton}
+              onPress={() => setDatePickerModal(true)}
+            >
+              <Text style={styles.pickerButtonText}>
+                {format(toZonedTime(parse(date, 'yyyy-MM-dd', new Date()), currentTimezone), 'EEE, MMM d, yyyy')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
-        {/* All-day toggle (only for leave) */}
-        {type === 'leave' && (
+        {/* Recurring Weekly toggle (only for new events) */}
+        {!params.eventId && (
+          <View style={styles.field}>
+            <View style={styles.switchRow}>
+              <View style={styles.switchLabelContainer}>
+                <Text style={styles.label}>Recurring Weekly Schedule</Text>
+                <Text style={styles.hint}>Create a repeating weekly schedule instead of a one-time event</Text>
+              </View>
+              <Switch
+                value={isRecurring}
+                onValueChange={(value) => {
+                  setIsRecurring(value);
+                  if (value) {
+                    // When enabling recurring, set the current day of week
+                    const currentDateObj = parse(date, 'yyyy-MM-dd', new Date());
+                    const currentDay = currentDateObj.getDay(); // 0 = Sunday, 1 = Monday, etc.
+                    setRecurringDays(new Set([currentDay]));
+                  } else {
+                    setRecurringDays(new Set());
+                  }
+                }}
+              />
+            </View>
+          </View>
+        )}
+
+        {/* Recurring days selector */}
+        {isRecurring && (
+          <View style={styles.field}>
+            <Text style={styles.label}>Days of Week *</Text>
+            <View style={styles.daysContainer}>
+              {[
+                { label: 'Sun', value: 0 },
+                { label: 'Mon', value: 1 },
+                { label: 'Tue', value: 2 },
+                { label: 'Wed', value: 3 },
+                { label: 'Thu', value: 4 },
+                { label: 'Fri', value: 5 },
+                { label: 'Sat', value: 6 },
+              ].map((day) => (
+                <TouchableOpacity
+                  key={day.value}
+                  style={[
+                    styles.dayButton,
+                    recurringDays.has(day.value) && styles.dayButtonSelected,
+                  ]}
+                  onPress={() => {
+                    const newDays = new Set(recurringDays);
+                    if (newDays.has(day.value)) {
+                      newDays.delete(day.value);
+                    } else {
+                      newDays.add(day.value);
+                    }
+                    setRecurringDays(newDays);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.dayButtonText,
+                      recurringDays.has(day.value) && styles.dayButtonTextSelected,
+                    ]}
+                  >
+                    {day.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* All-day toggle (only for leave, and not for recurring) */}
+        {type === 'leave' && !isRecurring && (
           <View style={styles.field}>
             <View style={styles.switchRow}>
               <Text style={styles.label}>All-day</Text>
@@ -450,36 +645,55 @@ export default function EventEditorScreen() {
           </View>
         )}
 
-        {/* Type picker */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Type *</Text>
-          <TouchableOpacity
-            style={styles.pickerButton}
-            onPress={() => setTypePickerModal(true)}
-          >
-            <Text style={styles.pickerButtonText}>
-              {type.charAt(0).toUpperCase() + type.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        {/* Type picker (only for one-time events) */}
+        {!isRecurring && (
+          <View style={styles.field}>
+            <Text style={styles.label}>Type *</Text>
+            <TouchableOpacity
+              style={styles.pickerButton}
+              onPress={() => setTypePickerModal(true)}
+            >
+              <Text style={styles.pickerButtonText}>
+                {type.charAt(0).toUpperCase() + type.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Title input */}
         <View style={styles.field}>
           <Text style={styles.label}>
-            Title {!isAllDay ? '*' : ''}
+            {isRecurring ? 'Schedule Name (optional)' : `Title ${!isAllDay ? '*' : ''}`}
           </Text>
           <Input
             value={title}
             onChangeText={setTitle}
-            placeholder={isAllDay ? "Leave (optional)" : "Enter event title"}
+            placeholder={
+              isRecurring 
+                ? "e.g., Regular Work Hours" 
+                : isAllDay 
+                  ? "Leave (optional)" 
+                  : "Enter event title"
+            }
             style={styles.input}
           />
         </View>
 
         <Button
-          title={params.eventId ? "Update Event" : "Save Event"}
+          title={
+            isRecurring 
+              ? "Save Weekly Schedule" 
+              : params.eventId 
+                ? "Update Event" 
+                : "Save Event"
+          }
           onPress={handleSave}
-          disabled={saving || (!isAllDay && !title.trim())}
+          disabled={
+            saving || 
+            (isRecurring 
+              ? recurringDays.size === 0 
+              : !isAllDay && !title.trim())
+          }
           style={styles.saveButton}
         />
       </ScrollView>
@@ -683,6 +897,43 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  switchLabelContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  hint: {
+    fontSize: 12,
+    color: '#666666',
+    marginTop: 4,
+  },
+  daysContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  dayButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#CCCCCC',
+    backgroundColor: '#FFFFFF',
+    minWidth: 50,
+    alignItems: 'center',
+  },
+  dayButtonSelected: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  dayButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  dayButtonTextSelected: {
+    color: '#FFFFFF',
   },
   saveButton: {
     marginTop: 8,

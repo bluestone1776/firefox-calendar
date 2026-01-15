@@ -21,6 +21,7 @@ import {
   deleteEvent,
   updateEvent,
   createEvent,
+  deleteWeeklyHours,
 } from '../../src/data/schedule';
 import { Profile, WeeklyHours, Event } from '../../src/types';
 import { DAY_START_HOUR, DAY_END_HOUR, PX_PER_MIN } from '../../src/constants/time';
@@ -58,6 +59,8 @@ export default function DailyScreen() {
   const [eventModalVisible, setEventModalVisible] = useState(false);
   const [quickActionsVisible, setQuickActionsVisible] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [selectedWorkingHours, setSelectedWorkingHours] = useState<WeeklyHours | null>(null);
+  const [workingHoursModalVisible, setWorkingHoursModalVisible] = useState(false);
   const [viewMode, setViewMode] = useState<'timeline' | 'availability'>('timeline');
   const [useFullDay, setUseFullDay] = useState(false);
   const [autoDayRange, setAutoDayRange] = useState({ startHour: DAY_START_HOUR, endHour: DAY_END_HOUR });
@@ -128,11 +131,13 @@ export default function DailyScreen() {
       const profilesData = await listProfiles();
       setProfiles(profilesData);
 
-      // Load weekly hours for this weekday
-      const hoursData = await getWeeklyHoursForWeekday(weekday);
+      // Load weekly hours for this weekday (convert from UTC to user's timezone)
+      const hoursData = await getWeeklyHoursForWeekday(weekday, currentTimezone);
+      console.log(`[Daily] Loading weekly hours for weekday ${weekday}:`, hoursData.length, 'entries');
       const hoursMap = new Map<string, WeeklyHours>();
       hoursData.forEach((hours) => {
         hoursMap.set(hours.profile_id, hours);
+        console.log(`[Daily] Weekly hours for profile ${hours.profile_id}: ${hours.start_hour}:${hours.start_minute} - ${hours.end_hour}:${hours.end_minute}`);
       });
       setWeeklyHours(hoursMap);
 
@@ -336,6 +341,66 @@ export default function DailyScreen() {
     setQuickActionsVisible(true);
   };
 
+  const handleWorkingHoursPress = (workingHours: WeeklyHours) => {
+    setSelectedWorkingHours(workingHours);
+    setWorkingHoursModalVisible(true);
+  };
+
+  const handleWorkingHoursLongPress = (workingHours: WeeklyHours) => {
+    setSelectedWorkingHours(workingHours);
+    setWorkingHoursModalVisible(true);
+  };
+
+  const handleEditWorkingHours = () => {
+    if (!selectedWorkingHours) return;
+    setWorkingHoursModalVisible(false);
+    // Calculate a date that matches the day of week being edited
+    const today = toZonedTime(new Date(), currentTimezone);
+    const todayDayOfWeek = getDay(today);
+    const dayDiff = selectedWorkingHours.day_of_week - todayDayOfWeek;
+    const targetDate = addDays(today, dayDiff);
+    
+    // Navigate to event editor with recurring enabled and day pre-selected
+    router.push({
+      pathname: '/(app)/event-editor',
+      params: {
+        userId: selectedWorkingHours.profile_id,
+        date: format(targetDate, 'yyyy-MM-dd'),
+        startHour: selectedWorkingHours.start_hour.toString(),
+        startMinute: selectedWorkingHours.start_minute.toString(),
+        endHour: selectedWorkingHours.end_hour.toString(),
+        endMinute: selectedWorkingHours.end_minute.toString(),
+        dayOfWeek: selectedWorkingHours.day_of_week.toString(), // Enable recurring mode
+      },
+    });
+  };
+
+  const handleDeleteWorkingHours = async () => {
+    if (!selectedWorkingHours) return;
+
+    Alert.alert(
+      'Delete Weekly Schedule',
+      `Are you sure you want to delete the schedule for ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][selectedWorkingHours.day_of_week]}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteWeeklyHours(selectedWorkingHours.id);
+              setWorkingHoursModalVisible(false);
+              setSelectedWorkingHours(null);
+              loadData(); // Refresh data
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to delete weekly schedule');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleDuplicateEvent = async () => {
     if (!selectedEvent) return;
 
@@ -391,7 +456,7 @@ export default function DailyScreen() {
 
   const DATE_OPTIONS = generateDateOptions();
 
-  const getEventTypeBadgeStyle = (type: 'meeting' | 'personal' | 'leave') => {
+  const getEventTypeBadgeStyle = (type: 'meeting' | 'personal' | 'leave' | 'working_hours') => {
     switch (type) {
       case 'meeting':
         return { backgroundColor: '#E3F2FD', borderColor: '#2196F3' };
@@ -533,8 +598,7 @@ export default function DailyScreen() {
       )}
 
       {/* Daily Confirmation (Staff only, Today only) - Only show if user is logged in */}
-      {/* Temporarily disabled to debug white screen issue */}
-      {false && !isAdmin && user?.id && isSameDay(currentDate, toZonedTime(new Date(), currentTimezone)) && (
+      {!isAdmin && user?.id && isSameDay(currentDate, toZonedTime(new Date(), currentTimezone)) && (
         <View style={styles.dailyConfirmationContainer}>
           <DailyConfirmation
             date={currentDate}
@@ -696,10 +760,12 @@ export default function DailyScreen() {
                           workingHours={profileHours}
                           events={profileEvents}
                           timezone={currentTimezone}
-                        onEventPress={handleEventPress}
-                        onEventLongPress={handleEventLongPress}
-                        onEventDragEnd={handleEventDragEnd}
-                        onEmptyAreaPress={handleEmptyAreaPress}
+                          onEventPress={handleEventPress}
+                          onEventLongPress={handleEventLongPress}
+                          onEventDragEnd={handleEventDragEnd}
+                          onEmptyAreaPress={handleEmptyAreaPress}
+                          onWorkingHoursPress={handleWorkingHoursPress}
+                          onWorkingHoursLongPress={handleWorkingHoursLongPress}
                           dayStartHour={dayStartHour}
                           dayEndHour={dayEndHour}
                           showHeader={false}
@@ -928,6 +994,80 @@ export default function DailyScreen() {
                     onPress={() => {
                       setEventModalVisible(false);
                       setSelectedEvent(null);
+                    }}
+                    variant="outline"
+                    style={styles.eventModalButton}
+                  />
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Working Hours Modal */}
+      <Modal
+        visible={workingHoursModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setWorkingHoursModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.eventModalContent}>
+            {selectedWorkingHours && (
+              <>
+                <View style={styles.eventModalHeader}>
+                  <View style={[styles.eventTypeBadge, { backgroundColor: '#4CAF50' }]}>
+                    <Text style={styles.eventTypeBadgeText}>Working Hours</Text>
+                  </View>
+                </View>
+                <Text style={styles.eventModalTitle}>
+                  {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][selectedWorkingHours.day_of_week]}
+                </Text>
+                <View style={styles.eventModalTimeRow}>
+                  <Text style={styles.eventModalTimeLabel}>Time:</Text>
+                  <Text style={styles.eventModalTime}>
+                    {(() => {
+                      const formatTime = (hour: number, minute: number) => {
+                        const period = hour >= 12 ? 'PM' : 'AM';
+                        const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+                        return `${displayHour}:${minute.toString().padStart(2, '0')} ${period}`;
+                      };
+                      return `${formatTime(selectedWorkingHours.start_hour, selectedWorkingHours.start_minute)} - ${formatTime(selectedWorkingHours.end_hour, selectedWorkingHours.end_minute)}`;
+                    })()}
+                  </Text>
+                </View>
+                <View style={styles.eventModalTimeRow}>
+                  <Text style={styles.eventModalTimeLabel}>Duration:</Text>
+                  <Text style={styles.eventModalTime}>
+                    {(() => {
+                      const startMinutes = selectedWorkingHours.start_hour * 60 + selectedWorkingHours.start_minute;
+                      const endMinutes = selectedWorkingHours.end_hour * 60 + selectedWorkingHours.end_minute;
+                      const duration = endMinutes - startMinutes;
+                      if (duration < 60) return `${duration}m`;
+                      const hours = Math.floor(duration / 60);
+                      const mins = duration % 60;
+                      return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+                    })()}
+                  </Text>
+                </View>
+                <View style={styles.eventModalActions}>
+                  <Button
+                    title="Edit"
+                    onPress={handleEditWorkingHours}
+                    style={styles.eventModalButton}
+                  />
+                  <Button
+                    title="Delete"
+                    onPress={handleDeleteWorkingHours}
+                    variant="outline"
+                    style={[styles.eventModalButton, { borderColor: '#FF3B30' }]}
+                  />
+                  <Button
+                    title="Close"
+                    onPress={() => {
+                      setWorkingHoursModalVisible(false);
+                      setSelectedWorkingHours(null);
                     }}
                     variant="outline"
                     style={styles.eventModalButton}

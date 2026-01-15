@@ -14,6 +14,8 @@ interface EmployeeColumnProps {
   onEventLongPress?: (event: Event) => void;
   onEventDragEnd?: (event: Event, newStartTime: Date, newEndTime: Date) => void;
   onEmptyAreaPress?: (profileId: string, timeMinutes: number) => void;
+  onWorkingHoursPress?: (workingHours: WeeklyHours) => void;
+  onWorkingHoursLongPress?: (workingHours: WeeklyHours) => void;
   dayStartHour?: number;
   dayEndHour?: number;
   showHeader?: boolean;
@@ -29,6 +31,8 @@ export function EmployeeColumn({
   onEventLongPress,
   onEventDragEnd,
   onEmptyAreaPress,
+  onWorkingHoursPress,
+  onWorkingHoursLongPress,
   dayStartHour = DAY_START_HOUR,
   dayEndHour = DAY_END_HOUR,
   showHeader = true,
@@ -61,7 +65,14 @@ export function EmployeeColumn({
         onPress={handleTimelinePress}
         activeOpacity={1}
       >
-        {workingHours && <WorkingHoursShade workingHours={workingHours} dayStartHour={dayStartHour} />}
+        {workingHours && (
+          <WorkingHoursShade 
+            workingHours={workingHours} 
+            dayStartHour={dayStartHour}
+            onPress={onWorkingHoursPress}
+            onLongPress={onWorkingHoursLongPress}
+          />
+        )}
         {events.map((event) => (
           <EventBlock
             key={event.id}

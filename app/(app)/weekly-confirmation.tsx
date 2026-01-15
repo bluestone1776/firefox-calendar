@@ -79,8 +79,8 @@ export default function WeeklyConfirmationScreen() {
 
     setLoading(true);
     try {
-      // Load weekly hours
-      const hours = await getWeeklyHoursForUser(user.id);
+      // Load weekly hours (convert from UTC to user's timezone)
+      const hours = await getWeeklyHoursForUser(user.id, currentTimezone);
       setWeeklyHours(hours);
 
       // Calculate week dates

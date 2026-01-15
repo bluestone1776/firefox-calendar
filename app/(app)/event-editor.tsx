@@ -222,13 +222,69 @@ export default function EventEditorScreen() {
       let startDateTime: string;
       let endDateTime: string;
 
+      // Parse date components
+      const [year, month, day] = date.split('-').map(Number);
+      
+      // Helper: Convert a time in target timezone to UTC (pure UTC, not offsetted)
+      // The components (y, m, d, h, min, sec) represent a time in the given timezone (tz)
+      // Returns an ISO string in UTC
+      const timeInTimezoneToUTC = (y: number, m: number, d: number, h: number, min: number, sec: number, tz: string): string => {
+        // Create a date string representing the time we want
+        const dateTimeStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}T${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+        
+        // Create a date in local timezone first
+        const localDate = new Date(dateTimeStr);
+        
+        // We need to find what UTC time corresponds to this time in the target timezone
+        // Strategy: create a test UTC date, see what it represents in target timezone,
+        // then adjust until we get the desired time
+        
+        // Start with a UTC date using our components
+        let testUTC = new Date(Date.UTC(y, m - 1, d, h, min, sec));
+        
+        // Check what time this UTC date represents in the target timezone
+        const formatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: tz,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        });
+        
+        let parts = formatter.formatToParts(testUTC);
+        let targetHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
+        let targetMinute = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
+        
+        // Calculate adjustment needed
+        const desiredMinutes = h * 60 + min;
+        const actualMinutes = targetHour * 60 + targetMinute;
+        let diffMinutes = desiredMinutes - actualMinutes;
+        
+        // Adjust and verify (handle day boundaries)
+        testUTC = new Date(testUTC.getTime() + diffMinutes * 60000);
+        
+        // Verify the result
+        parts = formatter.formatToParts(testUTC);
+        targetHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
+        targetMinute = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
+        
+        // If still not correct, adjust again (handles edge cases)
+        const finalDiff = (h * 60 + min) - (targetHour * 60 + targetMinute);
+        if (finalDiff !== 0) {
+          testUTC = new Date(testUTC.getTime() + finalDiff * 60000);
+        }
+        
+        // Return as UTC ISO string (pure UTC, no timezone offset in the string)
+        return testUTC.toISOString();
+      };
+      
       if (isAllDay && type === 'leave') {
         // All-day leave: 00:00 to 23:59 in the selected timezone
-        // Use format to ensure correct timezone interpretation
-        const startDate = toZonedTime(parse(`${date} 00:00:00`, 'yyyy-MM-dd HH:mm:ss', new Date()), currentTimezone);
-        const endDate = toZonedTime(parse(`${date} 23:59:59`, 'yyyy-MM-dd HH:mm:ss', new Date()), currentTimezone);
-        startDateTime = fromZonedTime(startDate, currentTimezone).toISOString();
-        endDateTime = fromZonedTime(endDate, currentTimezone).toISOString();
+        startDateTime = timeInTimezoneToUTC(year, month, day, 0, 0, 0, currentTimezone);
+        endDateTime = timeInTimezoneToUTC(year, month, day, 23, 59, 59, currentTimezone);
       } else {
         // Validate end > start
         const startTotal = startHour * 60 + startMinute;
@@ -240,16 +296,9 @@ export default function EventEditorScreen() {
           return;
         }
 
-        // Create date-time string in format "yyyy-MM-dd HH:mm:ss" and parse in timezone
-        // This ensures the time is interpreted in the correct timezone
-        const startTimeStr = `${date} ${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}:00`;
-        const endTimeStr = `${date} ${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}:00`;
-        
-        const startDate = toZonedTime(parse(startTimeStr, 'yyyy-MM-dd HH:mm:ss', new Date()), currentTimezone);
-        const endDate = toZonedTime(parse(endTimeStr, 'yyyy-MM-dd HH:mm:ss', new Date()), currentTimezone);
-        
-        startDateTime = fromZonedTime(startDate, currentTimezone).toISOString();
-        endDateTime = fromZonedTime(endDate, currentTimezone).toISOString();
+        // Convert times in target timezone to UTC
+        startDateTime = timeInTimezoneToUTC(year, month, day, startHour, startMinute, 0, currentTimezone);
+        endDateTime = timeInTimezoneToUTC(year, month, day, endHour, endMinute, 0, currentTimezone);
       }
 
       if (params.eventId) {

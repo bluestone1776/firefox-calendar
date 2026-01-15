@@ -539,17 +539,17 @@ export default function DailyScreen() {
           <DailyConfirmation
             date={currentDate}
             expectedHours={(() => {
-              if (!user?.id) return undefined;
+              if (!user || !user?.id) return undefined;
               const weekday = getDay(currentDate);
-              const userId = user.id;
-              const userHours = weeklyHours.get(userId);
-              if (!userHours || userHours.day_of_week !== weekday) {
+              const userId = user?.id;
+              const userHours = weeklyHours.get(userId || '');
+              if (!userHours || !userHours?.day_of_week || userHours?.day_of_week !== weekday) {
                 return undefined;
               }
               // TypeScript doesn't narrow correctly, but we've checked above
               const hours = userHours;
-              const startMinutes = hours.start_hour * 60 + hours.start_minute;
-              const endMinutes = hours.end_hour * 60 + hours.end_minute;
+              const startMinutes = (hours?.start_hour || 0) * 60 + (hours?.start_minute || 0);
+              const endMinutes = (hours?.end_hour || 0) * 60 + (hours?.end_minute || 0);
               return (endMinutes - startMinutes) / 60;
             })()}
             onConfirmationChange={() => {
@@ -642,7 +642,6 @@ export default function DailyScreen() {
                         styles.nowLine,
                         {
                           top: (() => {
-                            console.log(currentTimezone, formatTZ(toZonedTime(new Date(), currentTimezone), 'HH:mm', { timeZone: currentTimezone }));
                             const now = toZonedTime(new Date(), currentTimezone);
                             const hour = getHours(now);
                             const minute = getMinutes(now);

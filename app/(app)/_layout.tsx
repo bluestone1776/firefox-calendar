@@ -32,6 +32,18 @@ export default function AppLayout() {
           title: 'Settings',
         }}
       />
+      <Stack.Screen
+        name="weekly-confirmation"
+        options={{
+          title: 'Weekly Confirmation',
+        }}
+      />
+      <Stack.Screen
+        name="payroll-report"
+        options={{
+          title: 'Payroll Report',
+        }}
+      />
     </Stack>
   );
 }

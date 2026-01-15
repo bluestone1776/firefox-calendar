@@ -28,9 +28,10 @@ export function EventBlock({
   dayStartHour = DAY_START_HOUR,
   hasConflict = false,
 }: EventBlockProps) {
-  // Parse event times in the given timezone
-  const startTime = dayjs.tz(event.start, timezone);
-  const endTime = dayjs.tz(event.end, timezone);
+  // Parse event times from UTC and convert to the given timezone
+  // Events are stored as UTC ISO strings, so parse as UTC first, then convert to target timezone
+  const startTime = dayjs(event.start).utc().tz(timezone);
+  const endTime = dayjs(event.end).utc().tz(timezone);
   const durationMinutes = endTime.diff(startTime, 'minute');
 
   // Calculate position based on minutes from day start

@@ -1,21 +1,34 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, Modal, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, Modal, FlatList, TouchableOpacity, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
 import { supabase } from '../../src/lib/supabase';
 import { COMPANY_DOMAIN } from '../../src/constants/company';
 import { Button } from '../../src/components/ui/Button';
 import { getTimezone, setTimezone, COMMON_TIMEZONES, getDefaultTimezone } from '../../src/utils/timezone';
+// DISABLED: Notifications not working with Expo Go
+// import {
+//   requestNotificationPermissions,
+//   scheduleFridayReminder,
+//   scheduleDailyReminder,
+//   cancelFridayReminder,
+//   cancelDailyReminder,
+//   getAllScheduledNotifications,
+// } from '../../src/utils/notifications';
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, isAdmin } = useAuth();
   const [selectedTimezone, setSelectedTimezone] = useState<string>(getDefaultTimezone());
   const [timezonePickerVisible, setTimezonePickerVisible] = useState(false);
   const [loadingTimezone, setLoadingTimezone] = useState(true);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [loadingNotifications, setLoadingNotifications] = useState(true);
 
   useEffect(() => {
     loadTimezone();
+    // DISABLED: Notifications not working with Expo Go
+    // loadNotificationStatus();
   }, []);
 
   const loadTimezone = async () => {
@@ -40,6 +53,52 @@ export default function SettingsScreen() {
       Alert.alert('Error', 'Failed to update timezone');
     }
   };
+
+  // DISABLED: Notifications not working with Expo Go
+  // const loadNotificationStatus = async () => {
+  //   setLoadingNotifications(true);
+  //   try {
+  //     const notifications = await getAllScheduledNotifications();
+  //     const hasReminders = notifications.some(
+  //       (n) =>
+  //         n.content.data?.type === 'weekly_confirmation_reminder' ||
+  //         n.content.data?.type === 'daily_confirmation_reminder'
+  //     );
+  //     setNotificationsEnabled(hasReminders);
+  //   } catch (error) {
+  //     console.error('Error loading notification status:', error);
+  //   } finally {
+  //     setLoadingNotifications(false);
+  //   }
+  // };
+
+  // DISABLED: Notifications not working with Expo Go
+  // const handleNotificationToggle = async (enabled: boolean) => {
+  //   try {
+  //     if (enabled) {
+  //       const hasPermission = await requestNotificationPermissions();
+  //       if (!hasPermission) {
+  //         Alert.alert(
+  //           'Permission Required',
+  //           'Please enable notifications in your device settings to receive reminders.'
+  //         );
+  //         return;
+  //       }
+  //       await scheduleFridayReminder();
+  //       await scheduleDailyReminder();
+  //       setNotificationsEnabled(true);
+  //       Alert.alert('Success', 'Notifications enabled. You will receive reminders for weekly and daily confirmations.');
+  //     } else {
+  //       await cancelFridayReminder();
+  //       await cancelDailyReminder();
+  //       setNotificationsEnabled(false);
+  //       Alert.alert('Success', 'Notifications disabled.');
+  //     }
+  //   } catch (error: any) {
+  //     console.error('Error toggling notifications:', error);
+  //     Alert.alert('Error', 'Failed to update notification settings');
+  //   }
+  // };
 
   const handleLogout = async () => {
     Alert.alert(
@@ -120,6 +179,38 @@ export default function SettingsScreen() {
           All times in the calendar will be displayed in your selected timezone.
         </Text>
       </View>
+
+      {/* DISABLED: Notifications not working with Expo Go */}
+      {/* <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Notifications</Text>
+        <View style={styles.notificationRow}>
+          <View style={styles.notificationInfo}>
+            <Text style={styles.notificationLabel}>Enable Reminders</Text>
+            <Text style={styles.notificationHint}>
+              Receive reminders for weekly (Friday 3 PM) and daily (5 PM) hour confirmations
+            </Text>
+          </View>
+          {loadingNotifications ? (
+            <Text style={styles.loadingText}>Loading...</Text>
+          ) : (
+            <Switch
+              value={notificationsEnabled}
+              onValueChange={handleNotificationToggle}
+            />
+          )}
+        </View>
+      </View> */}
+
+      {isAdmin && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Admin Tools</Text>
+          <Button
+            title="Payroll Report"
+            onPress={() => router.push('/(app)/payroll-report')}
+            style={styles.adminButton}
+          />
+        </View>
+      )}
 
       <View style={styles.section}>
         <Button
@@ -216,6 +307,9 @@ const styles = StyleSheet.create({
   logoutButton: {
     marginTop: 8,
   },
+  adminButton: {
+    marginTop: 8,
+  },
   timezoneRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -298,5 +392,31 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     marginTop: 16,
+  },
+  notificationRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+  },
+  notificationInfo: {
+    flex: 1,
+    marginRight: 16,
+  },
+  notificationLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000000',
+    marginBottom: 4,
+  },
+  notificationHint: {
+    fontSize: 12,
+    color: '#666666',
+    lineHeight: 16,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#999999',
   },
 });

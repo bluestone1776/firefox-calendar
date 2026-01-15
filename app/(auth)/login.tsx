@@ -11,16 +11,12 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
+  const [useMagicLink, setUseMagicLink] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { ensureProfile } = useAuth();
 
   const handleAuth = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter both email and password');
-      return;
-    }
-
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
@@ -37,10 +33,50 @@ export default function LoginScreen() {
       return;
     }
 
+    // Validate company email for magic link
+    if (useMagicLink && !isCompanyEmail(email)) {
+      Alert.alert(
+        'Invalid Email Domain',
+        'Only company email addresses are allowed. Please use your company email.'
+      );
+      return;
+    }
+
+    // Password required for non-magic-link auth
+    if (!useMagicLink && !password.trim()) {
+      Alert.alert('Error', 'Please enter your password');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      if (isSignUp) {
+      if (useMagicLink) {
+        // Magic link sign in
+        const { error } = await supabase.auth.signInWithOtp({
+          email: email.toLowerCase().trim(),
+          options: {
+            emailRedirectTo: undefined, // No redirect needed for mobile
+          },
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        Alert.alert(
+          'Magic Link Sent',
+          'Please check your email for the magic link to sign in.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                setUseMagicLink(false);
+              },
+            },
+          ]
+        );
+      } else if (isSignUp) {
         // Sign up
         const { data, error } = await supabase.auth.signUp({
           email: email.toLowerCase().trim(),
@@ -66,7 +102,7 @@ export default function LoginScreen() {
           );
         }
       } else {
-        // Sign in
+        // Sign in with password
         const { data, error } = await supabase.auth.signInWithPassword({
           email: email.toLowerCase().trim(),
           password: password,
@@ -133,26 +169,51 @@ export default function LoginScreen() {
               style={styles.input}
             />
 
-            <Input
-              placeholder="Password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoCapitalize="none"
-              autoComplete={isSignUp ? 'password-new' : 'password'}
-              style={styles.input}
-            />
+            {!useMagicLink && (
+              <Input
+                placeholder="Password"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                autoCapitalize="none"
+                autoComplete={isSignUp ? 'password-new' : 'password'}
+                style={styles.input}
+              />
+            )}
 
             <Button
-              title={isSignUp ? 'Sign Up' : 'Sign In'}
+              title={
+                useMagicLink
+                  ? 'Send Magic Link'
+                  : isSignUp
+                  ? 'Sign Up'
+                  : 'Sign In'
+              }
               onPress={handleAuth}
               disabled={loading}
               style={styles.button}
             />
 
+            {!isSignUp && (
+              <Button
+                title={useMagicLink ? 'Use Password Instead' : 'Use Magic Link Instead'}
+                onPress={() => {
+                  setUseMagicLink(!useMagicLink);
+                  setPassword('');
+                }}
+                variant="outline"
+                disabled={loading}
+                style={styles.switchButton}
+              />
+            )}
+
             <Button
               title={isSignUp ? 'Already have an account? Sign In' : 'Need an account? Sign Up'}
-              onPress={() => setIsSignUp(!isSignUp)}
+              onPress={() => {
+                setIsSignUp(!isSignUp);
+                setUseMagicLink(false);
+                setPassword('');
+              }}
               variant="outline"
               disabled={loading}
               style={styles.switchButton}

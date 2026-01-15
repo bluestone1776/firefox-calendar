@@ -3,6 +3,7 @@
 export type Profile = {
   id: string;
   email: string;
+  name?: string;
   role: 'admin' | 'staff';
   created_at?: string;
   updated_at?: string;
@@ -27,6 +28,18 @@ export type Event = {
   start: string; // ISO 8601 datetime string
   end: string; // ISO 8601 datetime string
   type: 'meeting' | 'personal' | 'leave';
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type PayrollConfirmation = {
+  id: string;
+  profile_id: string;
+  date: string; // ISO date string (YYYY-MM-DD)
+  confirmed_hours: number;
+  confirmed_at?: string;
+  confirmed_by?: string;
+  notes?: string;
   created_at?: string;
   updated_at?: string;
 };

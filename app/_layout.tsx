@@ -7,6 +7,22 @@ export default function RootLayout() {
   const segments = useSegments();
   const router = useRouter();
 
+  // Initialize notifications when app starts (with error handling)
+  // DISABLED: Notifications not working with Expo Go
+  // useEffect(() => {
+  //   if (isAuthenticated) {
+  //     // Dynamically import to avoid blocking if notifications fail
+  //     import('../src/utils/notifications')
+  //       .then(({ initializeNotifications }) => {
+  //         return initializeNotifications();
+  //       })
+  //       .catch((error) => {
+  //         // Silently fail - notifications are optional
+  //         console.warn('Failed to initialize notifications:', error);
+  //       });
+  //   }
+  // }, [isAuthenticated]);
+
   useEffect(() => {
     if (loading) return;
 

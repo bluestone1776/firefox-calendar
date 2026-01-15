@@ -171,8 +171,8 @@ export default function EventEditorScreen() {
 
       const event = data as Event;
       const tz = await getTimezone();
-      const startTime = dayjs.tz(event.start, tz);
-      const endTime = dayjs.tz(event.end, tz);
+      const startTime = dayjs(event.start).utc().tz(tz);
+      const endTime = dayjs(event.end).utc().tz(tz);
 
       setSelectedUserId(event.profile_id);
       setDate(startTime.format('YYYY-MM-DD'));

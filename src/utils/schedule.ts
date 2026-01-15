@@ -45,8 +45,8 @@ export function computeStatusForUserAtTime(
 
   // Check if user has an event at this time
   const currentEvent = events.find((event) => {
-    const eventStart = dayjs.tz(event.start, tz);
-    const eventEnd = dayjs.tz(event.end, tz);
+    const eventStart = dayjs(event.start).utc().tz(tz);
+    const eventEnd = dayjs(event.end).utc().tz(tz);
     return dateTime.isAfter(eventStart) && dateTime.isBefore(eventEnd);
   });
 
@@ -105,8 +105,8 @@ export function computeNextChangeAcrossStaff(
   // Collect all event start/end times
   allEvents.forEach((events) => {
     events.forEach((event) => {
-      const eventStart = dayjs.tz(event.start, tz);
-      const eventEnd = dayjs.tz(event.end, tz);
+      const eventStart = dayjs(event.start).utc().tz(tz);
+      const eventEnd = dayjs(event.end).utc().tz(tz);
       if (eventStart.format('YYYY-MM-DD') === checkDate) {
         changeTimes.push(eventStart);
       }
@@ -162,8 +162,8 @@ export function computeAutoDayRangeFromShifts(
   if (allEvents) {
     allEvents.forEach((events) => {
       events.forEach((event) => {
-        const eventStart = dayjs.tz(event.start, tz);
-        const eventEnd = dayjs.tz(event.end, tz);
+        const eventStart = dayjs(event.start).utc().tz(tz);
+        const eventEnd = dayjs(event.end).utc().tz(tz);
         
         if (eventStart.format('YYYY-MM-DD') === checkDate) {
           hasAnyData = true;
@@ -187,8 +187,21 @@ export function computeAutoDayRangeFromShifts(
   }
 
   // Apply padding
-  const startHour = Math.max(0, Math.floor(earliestStart) - Math.ceil(paddingMinutes / 60));
-  const endHour = Math.min(24, Math.ceil(latestEnd) + Math.ceil(paddingMinutes / 60));
+  let startHour = Math.max(0, Math.floor(earliestStart) - Math.ceil(paddingMinutes / 60));
+  let endHour = Math.min(24, Math.ceil(latestEnd) + Math.ceil(paddingMinutes / 60));
+
+  // Ensure minimum range of at least 8 hours (6am-2pm or wider)
+  const minRange = 8;
+  if (endHour - startHour < minRange) {
+    // Center the range around the data, but ensure minimum span
+    const center = (earliestStart + latestEnd) / 2;
+    startHour = Math.max(0, Math.floor(center - minRange / 2));
+    endHour = Math.min(24, Math.ceil(center + minRange / 2));
+  }
+
+  // Ensure we show at least from 6am to 8pm if there's any data
+  startHour = Math.min(startHour, 6);
+  endHour = Math.max(endHour, 20);
 
   return { startHour, endHour };
 }
@@ -223,7 +236,7 @@ export function getNextBlockForUser(
 
   // Add upcoming events
   events.forEach((event) => {
-    const eventStart = dayjs.tz(event.start, tz);
+    const eventStart = dayjs(event.start).utc().tz(tz);
     if (eventStart.isAfter(currentTime) && eventStart.format('YYYY-MM-DD') === checkDate) {
       blocks.push({
         title: event.title,
@@ -249,14 +262,14 @@ export function hasEventConflict(
   allEvents: Event[],
   tz: string
 ): boolean {
-  const eventStart = dayjs.tz(event.start, tz);
-  const eventEnd = dayjs.tz(event.end, tz);
+  const eventStart = dayjs(event.start).utc().tz(tz);
+  const eventEnd = dayjs(event.end).utc().tz(tz);
 
   return allEvents.some((otherEvent) => {
     if (otherEvent.id === event.id) return false; // Don't conflict with itself
 
-    const otherStart = dayjs.tz(otherEvent.start, tz);
-    const otherEnd = dayjs.tz(otherEvent.end, tz);
+    const otherStart = dayjs(otherEvent.start).utc().tz(tz);
+    const otherEnd = dayjs(otherEvent.end).utc().tz(tz);
 
     // Events conflict if they overlap
     return (

@@ -29,6 +29,7 @@ import { TimeGutter } from '../../src/components/timeline/TimeGutter';
 import { EmployeeColumn } from '../../src/components/timeline/EmployeeColumn';
 import { useAuth } from '../../src/hooks/useAuth';
 import { Button } from '../../src/components/ui/Button';
+import { DailyConfirmation } from '../../src/components/payroll/DailyConfirmation';
 import {
   computeStatusForUserAtTime,
   computeNextChangeAcrossStaff,
@@ -46,8 +47,8 @@ const DEFAULT_TZ = process.env.EXPO_PUBLIC_DEFAULT_TZ || 'Australia/Sydney';
 
 export default function DailyScreen() {
   const router = useRouter();
-  const { isAdmin } = useAuth();
-  const [currentDate, setCurrentDate] = useState(dayjs.tz(undefined, DEFAULT_TZ));
+  const { isAdmin, user, profile } = useAuth();
+  const [currentDate, setCurrentDate] = useState(() => dayjs.tz(undefined, getDefaultTimezone()));
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [weeklyHours, setWeeklyHours] = useState<Map<string, WeeklyHours>>(
     new Map()
@@ -79,6 +80,16 @@ export default function DailyScreen() {
     loadTimezone();
   }, []);
 
+  // Update currentDate timezone when timezone changes (but only after initial load)
+  useEffect(() => {
+    // Convert currentDate to the new timezone while preserving the same calendar date
+    // Only update if timezone has actually changed from default
+    if (!isFirstMount.current) {
+      const dateStr = currentDate.format('YYYY-MM-DD');
+      setCurrentDate(dayjs.tz(dateStr, currentTimezone));
+    }
+  }, [currentTimezone]);
+
   // Load data for current date
   useEffect(() => {
     // Check if this is the first load
@@ -108,10 +119,12 @@ export default function DailyScreen() {
     
     try {
       // Get weekday (0 = Sunday, 1 = Monday, etc.)
-      const weekday = currentDate.day();
+      // Ensure currentDate is in the correct timezone
+      const dateInTimezone = currentDate.tz(currentTimezone);
+      const weekday = dateInTimezone.day();
 
       // Get date in ISO format (YYYY-MM-DD) in the target timezone
-      const dateISO = currentDate.format('YYYY-MM-DD');
+      const dateISO = dateInTimezone.format('YYYY-MM-DD');
 
       // Load profiles
       const profilesData = await listProfiles();
@@ -135,8 +148,11 @@ export default function DailyScreen() {
       setEvents(eventsMap);
 
       // Compute auto day range (include events for better range calculation)
-      const range = computeAutoDayRangeFromShifts(currentDate, hoursMap, currentTimezone, 60, eventsMap);
-      setAutoDayRange(range);
+      const range = computeAutoDayRangeFromShifts(dateInTimezone, hoursMap, currentTimezone, 60, eventsMap);
+      // Ensure minimum range for better UX
+      const minStartHour = Math.min(range.startHour, DAY_START_HOUR);
+      const maxEndHour = Math.max(range.endHour, DAY_END_HOUR);
+      setAutoDayRange({ startHour: minStartHour, endHour: maxEndHour });
     } catch (error: any) {
       console.error('Error loading data:', error);
       Alert.alert('Error', error.message || 'Failed to load calendar data');
@@ -290,8 +306,8 @@ export default function DailyScreen() {
   ) => {
     try {
       const duration = newEndTime.diff(newStartTime, 'minute');
-      const originalStart = dayjs.tz(event.start, currentTimezone);
-      const originalEnd = dayjs.tz(event.end, currentTimezone);
+      const originalStart = dayjs(event.start).utc().tz(currentTimezone);
+      const originalEnd = dayjs(event.end).utc().tz(currentTimezone);
       const originalDuration = originalEnd.diff(originalStart, 'minute');
 
       // If duration changed significantly, keep original duration
@@ -326,8 +342,8 @@ export default function DailyScreen() {
     if (!selectedEvent) return;
 
     try {
-      const startTime = dayjs.tz(selectedEvent.start, currentTimezone);
-      const endTime = dayjs.tz(selectedEvent.end, currentTimezone);
+      const startTime = dayjs(selectedEvent.start).utc().tz(currentTimezone);
+      const endTime = dayjs(selectedEvent.end).utc().tz(currentTimezone);
       const duration = endTime.diff(startTime, 'minute');
 
       // Create duplicate 30 minutes after original (or next day if at end of day)
@@ -518,6 +534,41 @@ export default function DailyScreen() {
         </View>
       )}
 
+      {/* Daily Confirmation (Staff only, Today only) - Only show if user is logged in */}
+      {/* Temporarily disabled to debug white screen issue */}
+      {false && !isAdmin && user?.id && currentDate.isSame(dayjs.tz(undefined, currentTimezone), 'day') && (
+        <View style={styles.dailyConfirmationContainer}>
+          <DailyConfirmation
+            date={currentDate}
+            expectedHours={(() => {
+              if (!user?.id) return undefined;
+              const weekday = currentDate.day();
+              const userId = user.id;
+              const userHours = weeklyHours.get(userId);
+              if (!userHours || userHours.day_of_week !== weekday) {
+                return undefined;
+              }
+              // TypeScript doesn't narrow correctly, but we've checked above
+              const hours = userHours;
+              const startMinutes = hours.start_hour * 60 + hours.start_minute;
+              const endMinutes = hours.end_hour * 60 + hours.end_minute;
+              return (endMinutes - startMinutes) / 60;
+            })()}
+            onConfirmationChange={() => {
+              // Optionally refresh data
+            }}
+          />
+          <TouchableOpacity
+            style={styles.weeklyConfirmationButton}
+            onPress={() => router.push('/(app)/weekly-confirmation')}
+          >
+            <Text style={styles.weeklyConfirmationButtonText}>
+              📋 Weekly Confirmation
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Subtle refreshing indicator - top progress bar */}
       {refreshing && (
         <View style={styles.refreshingIndicator}>
@@ -574,11 +625,14 @@ export default function DailyScreen() {
             style={styles.verticalScrollView}
             contentContainerStyle={[
               styles.verticalScrollContent,
-              { height: totalHeight },
+              { height: totalHeight + 100 },
             ]}
             showsVerticalScrollIndicator={true}
+            scrollEnabled={true}
+            nestedScrollEnabled={true}
+            bounces={true}
           >
-            <View style={styles.timelineContainer}>
+            <View style={[styles.timelineContainer, { height: totalHeight + 100 }]}>
               {/* Fixed TimeGutter */}
               <View style={styles.timeGutterContainer}>
                 <View style={[styles.timeGutterContent, { height: totalHeight }]}>
@@ -825,22 +879,22 @@ export default function DailyScreen() {
                 <View style={styles.eventModalTimeRow}>
                   <Text style={styles.eventModalTimeLabel}>Date:</Text>
                   <Text style={styles.eventModalTime}>
-                    {dayjs.tz(selectedEvent.start, currentTimezone).format('ddd, MMM D, YYYY')}
+                    {dayjs(selectedEvent.start).utc().tz(currentTimezone).format('ddd, MMM D, YYYY')}
                   </Text>
                 </View>
                 <View style={styles.eventModalTimeRow}>
                   <Text style={styles.eventModalTimeLabel}>Time:</Text>
                   <Text style={styles.eventModalTime}>
-                    {dayjs.tz(selectedEvent.start, currentTimezone).format('h:mm A')} -{' '}
-                    {dayjs.tz(selectedEvent.end, currentTimezone).format('h:mm A')}
+                    {dayjs(selectedEvent.start).utc().tz(currentTimezone).format('h:mm A')} -{' '}
+                    {dayjs(selectedEvent.end).utc().tz(currentTimezone).format('h:mm A')}
                   </Text>
                 </View>
                 <View style={styles.eventModalTimeRow}>
                   <Text style={styles.eventModalTimeLabel}>Duration:</Text>
                   <Text style={styles.eventModalTime}>
                     {(() => {
-                      const duration = dayjs.tz(selectedEvent.end, currentTimezone).diff(
-                        dayjs.tz(selectedEvent.start, currentTimezone),
+                      const duration = dayjs(selectedEvent.end).utc().tz(currentTimezone).diff(
+                        dayjs(selectedEvent.start).utc().tz(currentTimezone),
                         'minute'
                       );
                       if (duration < 60) return `${duration}m`;
@@ -1276,11 +1330,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   verticalScrollContent: {
-    flexGrow: 1,
+    // Height is set explicitly in contentContainerStyle
+    // Ensure content is always scrollable by adding padding
+    paddingBottom: 100,
   },
   timelineContainer: {
     flexDirection: 'row',
-    height: '100%',
   },
   timeGutterContainer: {
     width: 80,
@@ -1470,5 +1525,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666666',
     marginTop: 4,
+  },
+  dailyConfirmationContainer: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  weeklyConfirmationButton: {
+    marginTop: 8,
+    padding: 12,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    alignItems: 'center',
+  },
+  weeklyConfirmationButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#007AFF',
   },
 });

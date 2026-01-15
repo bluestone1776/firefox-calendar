@@ -9,6 +9,7 @@ This document contains the complete SQL setup for the Firefox Calendar applicati
 CREATE TABLE public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT NOT NULL UNIQUE,
+  name TEXT,
   role TEXT NOT NULL CHECK (role IN ('admin', 'staff')),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -42,6 +43,20 @@ CREATE TABLE public.events (
   CHECK ("end" > start)
 );
 
+-- Payroll confirmations table
+CREATE TABLE public.payroll_confirmations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  confirmed_hours DECIMAL(5,2) NOT NULL CHECK (confirmed_hours >= 0),
+  confirmed_at TIMESTAMPTZ DEFAULT NOW(),
+  confirmed_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(profile_id, date)
+);
+
 -- Create indexes for better query performance
 CREATE INDEX idx_weekly_hours_profile_id ON public.weekly_hours(profile_id);
 CREATE INDEX idx_weekly_hours_day_of_week ON public.weekly_hours(day_of_week);
@@ -49,6 +64,8 @@ CREATE INDEX idx_events_profile_id ON public.events(profile_id);
 CREATE INDEX idx_events_start ON public.events(start);
 CREATE INDEX idx_events_end ON public.events("end");
 CREATE INDEX idx_events_created_by ON public.events(created_by);
+CREATE INDEX idx_payroll_confirmations_profile_id ON public.payroll_confirmations(profile_id);
+CREATE INDEX idx_payroll_confirmations_date ON public.payroll_confirmations(date);
 ```
 
 ## 2. Enable Row Level Security (RLS)
@@ -58,6 +75,7 @@ CREATE INDEX idx_events_created_by ON public.events(created_by);
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.weekly_hours ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.payroll_confirmations ENABLE ROW LEVEL SECURITY;
 ```
 
 ## 3. Helper Functions
@@ -223,6 +241,49 @@ WITH CHECK (
 -- Admin can INSERT/UPDATE/DELETE any events
 CREATE POLICY "Admin can manage any events"
 ON public.events
+FOR ALL
+TO authenticated
+USING (
+  public.is_company_email((SELECT email FROM auth.users WHERE id = auth.uid())) AND
+  public.is_admin()
+)
+WITH CHECK (
+  public.is_company_email((SELECT email FROM auth.users WHERE id = auth.uid())) AND
+  public.is_admin()
+);
+```
+
+### Payroll Confirmations Policies
+
+```sql
+-- Allow authenticated company users to SELECT all payroll confirmations
+CREATE POLICY "Company users can view all payroll confirmations"
+ON public.payroll_confirmations
+FOR SELECT
+TO authenticated
+USING (
+  public.is_company_email((SELECT email FROM auth.users WHERE id = auth.uid()))
+);
+
+-- Staff can INSERT/UPDATE/DELETE only their own payroll confirmations
+CREATE POLICY "Staff can manage own payroll confirmations"
+ON public.payroll_confirmations
+FOR ALL
+TO authenticated
+USING (
+  profile_id = auth.uid() AND
+  public.is_company_email((SELECT email FROM auth.users WHERE id = auth.uid())) AND
+  NOT public.is_admin()
+)
+WITH CHECK (
+  profile_id = auth.uid() AND
+  public.is_company_email((SELECT email FROM auth.users WHERE id = auth.uid())) AND
+  NOT public.is_admin()
+);
+
+-- Admin can INSERT/UPDATE/DELETE any payroll confirmations
+CREATE POLICY "Admin can manage any payroll confirmations"
+ON public.payroll_confirmations
 FOR ALL
 TO authenticated
 USING (

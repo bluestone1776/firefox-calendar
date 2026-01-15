@@ -265,3 +265,88 @@ export function hasEventConflict(
     );
   });
 }
+
+/**
+ * Calculates layout positions for overlapping events
+ * Groups overlapping events and assigns them side-by-side positions
+ * @param events - All events to layout
+ * @param tz - Timezone string
+ * @returns Map of event ID to layout info { left, width, overlapIndex, totalOverlaps }
+ */
+export function calculateEventLayouts(
+  events: Event[],
+  tz: string
+): Map<string, { left: number; width: number; overlapIndex: number; totalOverlaps: number }> {
+  const layouts = new Map<string, { left: number; width: number; overlapIndex: number; totalOverlaps: number }>();
+  
+  if (events.length === 0) return layouts;
+
+  // Convert events to time ranges
+  const eventRanges = events.map((event) => {
+    const start = toZonedTime(new Date(event.start), tz);
+    const end = toZonedTime(new Date(event.end), tz);
+    return {
+      event,
+      start: start.getTime(),
+      end: end.getTime(),
+    };
+  });
+
+  // Sort by start time
+  eventRanges.sort((a, b) => a.start - b.start);
+
+  // Find overlapping groups
+  const groups: typeof eventRanges[] = [];
+  let currentGroup: typeof eventRanges = [];
+
+  for (let i = 0; i < eventRanges.length; i++) {
+    const current = eventRanges[i];
+    
+    if (currentGroup.length === 0) {
+      currentGroup.push(current);
+    } else {
+      // Check if current overlaps with any in current group
+      const overlaps = currentGroup.some(
+        (existing) =>
+          (current.start < existing.end && current.end > existing.start)
+      );
+
+      if (overlaps) {
+        currentGroup.push(current);
+      } else {
+        // Start a new group
+        groups.push(currentGroup);
+        currentGroup = [current];
+      }
+    }
+  }
+  if (currentGroup.length > 0) {
+    groups.push(currentGroup);
+  }
+
+  // Calculate layout for each group
+  groups.forEach((group) => {
+    if (group.length === 1) {
+      // Single event - full width
+      layouts.set(group[0].event.id, {
+        left: 0,
+        width: 100,
+        overlapIndex: 0,
+        totalOverlaps: 1,
+      });
+    } else {
+      // Multiple overlapping events - divide width
+      const widthPercent = 100 / group.length;
+      group.forEach((item, index) => {
+        layouts.set(item.event.id, {
+          left: index * widthPercent,
+          width: widthPercent,
+          overlapIndex: index,
+          totalOverlaps: group.length,
+        });
+      });
+    }
+  });
+
+  return layouts;
+}

@@ -1,8 +1,8 @@
 import { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, PanResponder, Animated, Pressable } from 'react-native';
 import { Event } from '../../types';
-import { DAY_START_HOUR, PX_PER_MIN, TIME_BLOCK_MINUTES } from '../../constants/time';
-import { format, getHours, getMinutes, differenceInMinutes, addMinutes } from 'date-fns';
+import { DAY_START_HOUR, DAY_END_HOUR, PX_PER_MIN, TIME_BLOCK_MINUTES } from '../../constants/time';
+import { format, getHours, getMinutes, differenceInMinutes, addMinutes, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 
 interface EventBlockProps {
@@ -12,7 +12,9 @@ interface EventBlockProps {
   onLongPress?: (event: Event) => void;
   onDragEnd?: (event: Event, newStartTime: Date, newEndTime: Date) => void;
   dayStartHour?: number;
+  dayEndHour?: number;
   hasConflict?: boolean;
+  layout?: { left: number; width: number; overlapIndex: number; totalOverlaps: number };
 }
 
 export function EventBlock({
@@ -22,13 +24,26 @@ export function EventBlock({
   onLongPress,
   onDragEnd,
   dayStartHour = DAY_START_HOUR,
+  dayEndHour = DAY_END_HOUR,
   hasConflict = false,
+  layout,
 }: EventBlockProps) {
   // Parse event times from UTC and convert to the given timezone
   // Events are stored as UTC ISO strings, so parse as UTC first, then convert to target timezone
   const startTime = toZonedTime(new Date(event.start), timezone);
   const endTime = toZonedTime(new Date(event.end), timezone);
-  const durationMinutes = differenceInMinutes(endTime, startTime);
+  
+  // Check if this is an all-day leave event (spans full day)
+  const isAllDayLeave = event.type === 'leave' && 
+    (event.is_all_day || 
+     (isSameDay(startTime, endTime) && 
+      getHours(startTime) === 0 && getMinutes(startTime) === 0 &&
+      getHours(endTime) === 23 && getMinutes(endTime) === 59));
+
+  // For all-day leave, span the full visible day
+  const durationMinutes = isAllDayLeave 
+    ? (dayEndHour - dayStartHour) * 60 
+    : differenceInMinutes(endTime, startTime);
 
   // Calculate position based on minutes from day start
   const getPosition = (date: Date) => {
@@ -38,7 +53,8 @@ export function EventBlock({
     return minutesFromStart * PX_PER_MIN;
   };
 
-  const initialStartPosition = getPosition(startTime);
+  // For all-day leave, start at the top of the visible day
+  const initialStartPosition = isAllDayLeave ? 0 : getPosition(startTime);
   const [dragY] = useState(new Animated.Value(0));
   const [isDragging, setIsDragging] = useState(false);
   const [isPressed, setIsPressed] = useState(false);
@@ -127,32 +143,60 @@ export function EventBlock({
 
   const content = (
     <>
-      {/* Conflict indicator */}
-      {hasConflict && (
+      {/* Conflict indicator - show when overlapping */}
+      {layout && layout.totalOverlaps > 1 && (
+        <View style={styles.overlapIndicator}>
+          <Text style={styles.overlapBadge}>
+            {layout.overlapIndex + 1}/{layout.totalOverlaps}
+          </Text>
+        </View>
+      )}
+      {/* Conflict warning - show when has conflict but not in layout (edge case) */}
+      {hasConflict && (!layout || layout.totalOverlaps === 1) && (
         <View style={styles.conflictIndicator}>
           <View style={styles.conflictDot} />
         </View>
       )}
       
-      <View style={styles.timeHeader}>
-        <Text style={[styles.timeStart, getTypeTextStyle()]} numberOfLines={1}>
-          {format(startTime, 'h:mm')}
-        </Text>
-        {height > 40 && (
-          <Text style={[styles.duration, getTypeTextStyle()]} numberOfLines={1}>
-            {formatDuration(durationMinutes)}
+      {isAllDayLeave ? (
+        // All-day leave display
+        <>
+          <View style={styles.allDayBadge}>
+            <Text style={styles.allDayText}>ALL DAY</Text>
+          </View>
+          <Text style={[styles.title, getTypeTextStyle()]} numberOfLines={height > 50 ? 2 : 1}>
+            {event.title || 'Leave'}
           </Text>
-        )}
-      </View>
-      
-      <Text style={[styles.title, getTypeTextStyle()]} numberOfLines={height > 50 ? 2 : 1}>
-        {event.title}
-      </Text>
-      
-      {height > 50 && (
-        <Text style={[styles.timeEnd, getTypeTextStyle()]} numberOfLines={1}>
-          Until {format(endTime, 'h:mm a')}
-        </Text>
+          {height > 60 && (
+            <Text style={[styles.allDaySubtext, getTypeTextStyle()]} numberOfLines={1}>
+              Unavailable
+            </Text>
+          )}
+        </>
+      ) : (
+        // Regular event display
+        <>
+          <View style={styles.timeHeader}>
+            <Text style={[styles.timeStart, getTypeTextStyle()]} numberOfLines={1}>
+              {format(startTime, 'h:mm')}
+            </Text>
+            {height > 40 && (
+              <Text style={[styles.duration, getTypeTextStyle()]} numberOfLines={1}>
+                {formatDuration(durationMinutes)}
+              </Text>
+            )}
+          </View>
+          
+          <Text style={[styles.title, getTypeTextStyle()]} numberOfLines={height > 50 ? 2 : 1}>
+            {event.title}
+          </Text>
+          
+          {height > 50 && (
+            <Text style={[styles.timeEnd, getTypeTextStyle()]} numberOfLines={1}>
+              Until {format(endTime, 'h:mm a')}
+            </Text>
+          )}
+        </>
       )}
 
       {/* Drag indicator */}
@@ -167,12 +211,29 @@ export function EventBlock({
     </>
   );
 
+  // Calculate layout styles for overlapping events
+  // Column width is typically 200px (minWidth), so we calculate based on that
+  const COLUMN_WIDTH = 200;
+  const HORIZONTAL_PADDING = 4; // left/right padding from block style
+  const AVAILABLE_WIDTH = COLUMN_WIDTH - (HORIZONTAL_PADDING * 2);
+  
+  const layoutStyle = layout
+    ? {
+        left: HORIZONTAL_PADDING + (layout.left / 100) * AVAILABLE_WIDTH,
+        width: (layout.width / 100) * AVAILABLE_WIDTH - (layout.totalOverlaps > 1 ? 2 : 0),
+      }
+    : {
+        left: HORIZONTAL_PADDING,
+        right: HORIZONTAL_PADDING,
+      };
+
   const blockStyle = [
     styles.block,
     getTypeStyle(),
     isDragging && styles.dragging,
     hasConflict && styles.conflict,
     isPressed && styles.pressed,
+    layoutStyle,
   ];
 
   const handlePress = () => {
@@ -259,8 +320,6 @@ export function EventBlock({
 const styles = StyleSheet.create({
   block: {
     position: 'absolute',
-    left: 4,
-    right: 4,
     padding: 10,
     borderRadius: 8,
     overflow: 'visible',
@@ -299,6 +358,25 @@ const styles = StyleSheet.create({
     borderLeftWidth: 5,
     borderLeftColor: '#FF9800',
   },
+  allDayBadge: {
+    backgroundColor: '#FF9800',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+    marginBottom: 4,
+  },
+  allDayText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  allDaySubtext: {
+    fontSize: 11,
+    marginTop: 4,
+    opacity: 0.8,
+  },
   default: {
     backgroundColor: '#F5F5F5',
     borderLeftWidth: 5,
@@ -315,6 +393,23 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: '#FF3B30',
+  },
+  overlapIndicator: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    zIndex: 10,
+    backgroundColor: 'rgba(255, 59, 48, 0.9)',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    minWidth: 24,
+    alignItems: 'center',
+  },
+  overlapBadge: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   timeHeader: {
     flexDirection: 'row',

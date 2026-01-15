@@ -16,7 +16,7 @@ import { format, parse, getHours, getMinutes, addDays } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { useAuth } from '../../src/hooks/useAuth';
 import { listProfiles } from '../../src/data/profiles';
-import { createEvent, updateEvent } from '../../src/data/schedule';
+import { createEvent, updateEvent, deleteEvent } from '../../src/data/schedule';
 import { Profile, Event } from '../../src/types';
 import { TIME_BLOCK_MINUTES, DAY_START_HOUR, DAY_END_HOUR } from '../../src/constants/time';
 import { Input } from '../../src/components/ui/Input';
@@ -72,6 +72,8 @@ export default function EventEditorScreen() {
     endHour?: string;
     endMinute?: string;
     dayOfWeek?: string; // For editing weekly schedules: 0 = Sunday, 1 = Monday, etc.
+    type?: string; // Pre-select event type (meeting, personal, leave)
+    isAllDay?: string; // Pre-select all-day (true/false as string)
   }>();
   const { user, isAdmin, profile } = useAuth();
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -91,9 +93,11 @@ export default function EventEditorScreen() {
   const [endMinute, setEndMinute] = useState(
     params.endMinute ? parseInt(params.endMinute) : 30
   );
-  const [type, setType] = useState<'meeting' | 'personal' | 'leave' | 'working_hours'>('meeting');
+  const [type, setType] = useState<'meeting' | 'personal' | 'leave' | 'working_hours'>(
+    (params.type as 'meeting' | 'personal' | 'leave' | 'working_hours') || 'meeting'
+  );
   const [title, setTitle] = useState('');
-  const [isAllDay, setIsAllDay] = useState(false);
+  const [isAllDay, setIsAllDay] = useState(params.isAllDay === 'true');
   // If dayOfWeek is provided, we're editing a weekly schedule - enable recurring by default
   const [isRecurring, setIsRecurring] = useState(params.dayOfWeek !== undefined);
   const [recurringDays, setRecurringDays] = useState<Set<number>>(
@@ -432,6 +436,7 @@ export default function EventEditorScreen() {
           start: startDateTime,
           end: endDateTime,
           type,
+          is_all_day: isAllDay && type === 'leave',
         });
       } else {
         // Create new event
@@ -442,6 +447,7 @@ export default function EventEditorScreen() {
             start: startDateTime,
             end: endDateTime,
             type,
+            is_all_day: isAllDay && type === 'leave',
           },
           user?.id
         );
@@ -455,6 +461,35 @@ export default function EventEditorScreen() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleDelete = async () => {
+    if (!params.eventId) return;
+
+    Alert.alert(
+      'Delete Event',
+      'Are you sure you want to delete this event? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteEvent(params.eventId!);
+              // Navigate back to daily view
+              router.replace('/(app)/daily');
+            } catch (error: any) {
+              console.error('Error deleting event:', error);
+              Alert.alert('Error', error.message || 'Failed to delete event');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const selectTime = (hour: number, minute: number) => {
@@ -696,6 +731,16 @@ export default function EventEditorScreen() {
           }
           style={styles.saveButton}
         />
+
+        {/* Delete button - only show when editing existing event */}
+        {params.eventId && !isRecurring && (
+          <Button
+            title="Delete Event"
+            onPress={handleDelete}
+            disabled={saving}
+            style={[styles.deleteButton, styles.saveButton]}
+          />
+        )}
       </ScrollView>
 
       {/* Date Picker Modal */}
@@ -937,7 +982,11 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     marginTop: 8,
-    marginBottom: 32,
+    marginBottom: 16,
+  },
+  deleteButton: {
+    backgroundColor: '#FF3B30',
+    borderColor: '#FF3B30',
   },
   modalOverlay: {
     flex: 1,

@@ -197,6 +197,18 @@ export default function DailyScreen() {
     });
   };
 
+  const handleAddLeave = () => {
+    // Quick add leave - pre-select leave type and all-day
+    router.push({
+      pathname: '/(app)/event-editor',
+      params: {
+        date: format(currentDate, 'yyyy-MM-dd'),
+        type: 'leave',
+        isAllDay: 'true',
+      },
+    });
+  };
+
   const handleJumpToNow = () => {
     const now = toZonedTime(new Date(), currentTimezone);
     const hour = getHours(now);
@@ -230,6 +242,19 @@ export default function DailyScreen() {
         startMinute: snappedMinute.toString(),
         endHour: endHour.toString(),
         endMinute: endMinute.toString(),
+      },
+    });
+  };
+
+  const handleEmptyAreaLongPress = (profileId: string, timeMinutes: number) => {
+    // Long press on empty area - quick add leave
+    router.push({
+      pathname: '/(app)/event-editor',
+      params: {
+        date: format(currentDate, 'yyyy-MM-dd'),
+        userId: profileId,
+        type: 'leave',
+        isAllDay: 'true',
       },
     });
   };
@@ -524,6 +549,14 @@ export default function DailyScreen() {
             <Text style={styles.actionButtonText}>⚙️</Text>
           </TouchableOpacity>
           <TouchableOpacity
+            style={[styles.actionButton, styles.leaveButton]}
+            onPress={handleAddLeave}
+          >
+            <Text style={[styles.actionButtonText, styles.leaveButtonText]}>
+              🏖️ Leave
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[styles.actionButton, styles.primaryButton]}
             onPress={handleAddEvent}
           >
@@ -764,6 +797,7 @@ export default function DailyScreen() {
                           onEventLongPress={handleEventLongPress}
                           onEventDragEnd={handleEventDragEnd}
                           onEmptyAreaPress={handleEmptyAreaPress}
+                          onEmptyAreaLongPress={handleEmptyAreaLongPress}
                           onWorkingHoursPress={handleWorkingHoursPress}
                           onWorkingHoursLongPress={handleWorkingHoursLongPress}
                           dayStartHour={dayStartHour}
@@ -1218,6 +1252,14 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 6,
     backgroundColor: '#F5F5F5',
+  },
+  leaveButton: {
+    backgroundColor: '#FFF3E0',
+    borderWidth: 1,
+    borderColor: '#FF9800',
+  },
+  leaveButtonText: {
+    color: '#FF9800',
   },
   primaryButton: {
     backgroundColor: '#007AFF',

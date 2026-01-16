@@ -10,7 +10,7 @@
     "scheme": "firefox-calendar",
     "extra": {
       "eas": {
-        "projectId": "a1897317-40c0-4172-b4d0-bb8051b2aa34"
+        "projectId": "c6f6e91b-795e-45d8-9fde-3ecd39ec137e"
       },
       "router": {}
     },
@@ -21,7 +21,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.firefoxcalendar"
+      "bundleIdentifier": "com.firefoxtraining.firefoxcalendar"
     },
     "android": {
       "adaptiveIcon": {
@@ -30,7 +30,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.firefoxcalendar",
+      "package": "com.firefoxtraining.firefoxcalendar",
       "intentFilters": [
         {
           "action": "VIEW",

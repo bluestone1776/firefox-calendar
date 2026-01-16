@@ -7,6 +7,7 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Switch,
 } from 'react-native';
 import { format, isSameDay } from 'date-fns';
 import { useAuth } from '../../hooks/useAuth';
@@ -35,6 +36,7 @@ export function DailyConfirmation({
   const [notes, setNotes] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showDetails, setShowDetails] = useState(true);
 
   const dateISO = format(date, 'yyyy-MM-dd');
 
@@ -55,10 +57,12 @@ export function DailyConfirmation({
         setIsConfirmed(true);
         setHours(data.confirmed_hours.toString());
         setNotes(data.notes || '');
+        setShowDetails(false);
       } else {
         setIsConfirmed(false);
         setHours(expectedHours?.toString() || '8.0');
         setNotes('');
+        setShowDetails(true);
       }
     } catch (error: any) {
       // Silently handle errors - table might not exist yet
@@ -66,6 +70,7 @@ export function DailyConfirmation({
       setIsConfirmed(false);
       setHours(expectedHours?.toString() || '8.0');
       setNotes('');
+      setShowDetails(true);
     } finally {
       setLoading(false);
     }
@@ -79,6 +84,7 @@ export function DailyConfirmation({
     if (checked) {
       // Save confirmation
       await saveConfirmation();
+      setShowDetails(false);
     } else {
       // Delete confirmation
       if (confirmation?.id) {
@@ -88,6 +94,7 @@ export function DailyConfirmation({
           setConfirmation(null);
           setHours(expectedHours?.toString() || '8.0');
           setNotes('');
+          setShowDetails(true);
           onConfirmationChange?.();
         } catch (error: any) {
           console.error('Error deleting confirmation:', error);
@@ -149,34 +156,86 @@ export function DailyConfirmation({
   }
 
   const isToday = isSameDay(date, new Date());
+  const parsedHours = Number.parseFloat(hours);
+  const hasHoursValue = Number.isFinite(parsedHours);
+  const deltaHours =
+    expectedHours !== undefined && hasHoursValue ? parsedHours - expectedHours : null;
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>
-          {isToday ? 'Confirm Hours Worked Today' : `Confirm Hours for ${format(date, 'MMM d')}`}
-        </Text>
-        <TouchableOpacity
-          style={[styles.checkbox, isConfirmed && styles.checkboxChecked]}
-          onPress={() => !saving && handleToggle(!isConfirmed)}
-          disabled={saving}
-        >
-          {isConfirmed && <Text style={styles.checkmark}>✓</Text>}
-        </TouchableOpacity>
+        <View style={styles.headerTitleGroup}>
+          <Text style={styles.title}>
+            {isToday ? 'Confirm Hours Worked Today' : `Confirm Hours for ${format(date, 'MMM d')}`}
+          </Text>
+          <Text style={styles.subtitle}>Daily payroll confirmation</Text>
+        </View>
+        <View style={styles.toggleRow}>
+          <Text style={styles.toggleLabel}>{isConfirmed ? 'Confirmed' : 'Not confirmed'}</Text>
+          <Switch
+            value={isConfirmed}
+            onValueChange={(checked) => {
+              if (!saving) {
+                handleToggle(checked);
+              }
+            }}
+            disabled={saving}
+          />
+          {isConfirmed && (
+            <TouchableOpacity
+              style={styles.detailsToggle}
+              onPress={() => setShowDetails((prev) => !prev)}
+              disabled={saving}
+            >
+              <Text style={styles.detailsToggleText}>
+                {showDetails ? 'Hide details' : 'Edit details'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
-      {isConfirmed && (
+      <View style={styles.metaRow}>
+        <View style={[styles.pill, isConfirmed ? styles.pillConfirmed : styles.pillPending]}>
+          <Text style={styles.pillText}>{isConfirmed ? 'Confirmed' : 'Pending'}</Text>
+        </View>
+        {expectedHours !== undefined && (
+          <View style={styles.pill}>
+            <Text style={styles.pillTextMuted}>
+              Expected {expectedHours.toFixed(1)}h
+            </Text>
+          </View>
+        )}
+        {isConfirmed && deltaHours !== null && (
+          <View
+            style={[
+              styles.pill,
+              deltaHours >= 0 ? styles.pillPositive : styles.pillNegative,
+            ]}
+          >
+            <Text style={styles.pillText}>
+              {deltaHours >= 0 ? '+' : '-'}
+              {Math.abs(deltaHours).toFixed(1)}h
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {(isConfirmed ? showDetails : true) && (
         <View style={styles.content}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Hours Worked:</Text>
-            <TextInput
-              style={styles.input}
-              value={hours}
-              onChangeText={handleHoursChange}
-              keyboardType="decimal-pad"
-              placeholder="8.0"
-              editable={!saving}
-            />
+            <Text style={styles.label}>Hours worked</Text>
+            <View style={styles.hoursInputRow}>
+              <TextInput
+                style={[styles.input, styles.hoursInput]}
+                value={hours}
+                onChangeText={handleHoursChange}
+                keyboardType="decimal-pad"
+                placeholder="8.0"
+                editable={!saving}
+              />
+              <Text style={styles.hoursSuffix}>hrs</Text>
+            </View>
             {expectedHours !== undefined && (
               <Text style={styles.hint}>
                 Expected: {expectedHours.toFixed(1)} hours
@@ -185,7 +244,7 @@ export function DailyConfirmation({
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Notes (optional):</Text>
+            <Text style={styles.label}>Notes (optional)</Text>
             <TextInput
               style={[styles.input, styles.notesInput]}
               value={notes}
@@ -216,43 +275,92 @@ export function DailyConfirmation({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#F8F9FA',
-    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
     padding: 16,
     marginVertical: 8,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#E5E7EB',
+    shadowColor: '#111827',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 2,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    alignItems: 'flex-start',
+    marginBottom: 10,
+    gap: 12,
+  },
+  headerTitleGroup: {
+    flex: 1,
   },
   title: {
     fontSize: 16,
     fontWeight: '600',
     color: '#000000',
-    flex: 1,
   },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: '#CCCCCC',
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
+  subtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
   },
-  checkboxChecked: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+  toggleRow: {
+    alignItems: 'flex-end',
   },
-  checkmark: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
+  detailsToggle: {
+    paddingVertical: 4,
+  },
+  detailsToggleText: {
+    fontSize: 12,
+    color: '#2563EB',
+    fontWeight: '600',
+  },
+  toggleLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  pill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  pillConfirmed: {
+    backgroundColor: '#ECFDF3',
+    borderColor: '#A7F3D0',
+  },
+  pillPending: {
+    backgroundColor: '#FFF7ED',
+    borderColor: '#FED7AA',
+  },
+  pillPositive: {
+    backgroundColor: '#ECFDF3',
+    borderColor: '#A7F3D0',
+  },
+  pillNegative: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  pillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  pillTextMuted: {
+    fontSize: 12,
+    color: '#6B7280',
   },
   content: {
     marginTop: 12,
@@ -263,17 +371,30 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#666666',
+    color: '#374151',
     marginBottom: 8,
+  },
+  hoursInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   input: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#CCCCCC',
+    borderColor: '#D1D5DB',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
     color: '#000000',
+  },
+  hoursInput: {
+    flex: 1,
+  },
+  hoursSuffix: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '600',
   },
   notesInput: {
     minHeight: 60,
@@ -281,7 +402,7 @@ const styles = StyleSheet.create({
   },
   hint: {
     fontSize: 12,
-    color: '#999999',
+    color: '#6B7280',
     marginTop: 4,
   },
   saveButton: {

@@ -24,6 +24,29 @@ export async function listProfiles(): Promise<Profile[]> {
 }
 
 /**
+ * Updates a profile's timezone
+ */
+export async function updateProfileTimezone(
+  profileId: string,
+  timezone: string
+): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ timezone })
+      .eq('id', profileId);
+
+    if (error) {
+      console.error('Error updating profile timezone:', error);
+      throw new Error(`Failed to update timezone: ${error.message}`);
+    }
+  } catch (error) {
+    console.error('Error in updateProfileTimezone:', error);
+    throw error;
+  }
+}
+
+/**
  * Gets the current user's profile
  */
 export async function getMyProfile(): Promise<Profile | null> {

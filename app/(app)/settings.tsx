@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Alert, Modal, FlatList, TouchableOp
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
 import { supabase } from '../../src/lib/supabase';
+import { updateProfileTimezone } from '../../src/data/profiles';
 import { COMPANY_DOMAIN } from '../../src/constants/company';
 import { Button } from '../../src/components/ui/Button';
 import { getTimezone, setTimezone, COMMON_TIMEZONES, getDefaultTimezone } from '../../src/utils/timezone';
@@ -29,10 +30,14 @@ export default function SettingsScreen() {
     loadTimezone();
     // DISABLED: Notifications not working with Expo Go
     // loadNotificationStatus();
-  }, []);
+  }, [profile?.timezone]);
 
   const loadTimezone = async () => {
     try {
+      if (profile?.timezone) {
+        setSelectedTimezone(profile.timezone);
+        return;
+      }
       const tz = await getTimezone();
       setSelectedTimezone(tz);
     } catch (error) {
@@ -44,10 +49,15 @@ export default function SettingsScreen() {
 
   const handleTimezoneChange = async (timezone: string) => {
     try {
+      if (!profile?.id) {
+        Alert.alert('Error', 'No profile found to update timezone.');
+        return;
+      }
       await setTimezone(timezone);
+      await updateProfileTimezone(profile.id, timezone);
       setSelectedTimezone(timezone);
       setTimezonePickerVisible(false);
-      Alert.alert('Success', 'Timezone updated. Please refresh the calendar view.');
+      Alert.alert('Success', 'Timezone updated.');
     } catch (error: any) {
       console.error('Error setting timezone:', error);
       Alert.alert('Error', 'Failed to update timezone');

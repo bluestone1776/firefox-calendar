@@ -5,6 +5,7 @@ export type Profile = {
   email: string;
   name?: string;
   role: 'admin' | 'staff';
+  timezone?: string;
   created_at?: string;
   updated_at?: string;
 };

@@ -1,7 +1,12 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 // date-fns-tz is now used instead of dayjs
 import { Profile, WeeklyHours, Event } from '../../types';
-import { DAY_START_HOUR, DAY_END_HOUR, PX_PER_MIN } from '../../constants/time';
+import {
+  DAY_START_HOUR,
+  DAY_END_HOUR,
+  PX_PER_MIN,
+  EMPLOYEE_COLUMN_WIDTH,
+} from '../../constants/time';
 import { WorkingHoursShade } from './WorkingHoursShade';
 import { EventBlock } from './EventBlock';
 import { toZonedTime } from 'date-fns-tz';
@@ -110,7 +115,7 @@ export function EmployeeColumn({
       )}
       <TouchableOpacity
         style={[
-          styles.timeline, 
+          styles.timeline,
           { height: totalHeight },
           hasAllDayLeave && styles.timelineLeave
         ]}
@@ -118,6 +123,7 @@ export function EmployeeColumn({
         onLongPress={handleTimelineLongPress}
         delayLongPress={500}
         activeOpacity={1}
+        delayPressIn={50}
       >
         {workingHours && !hasAllDayLeave && (
           <WorkingHoursShade 
@@ -152,7 +158,7 @@ export function EmployeeColumn({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    minWidth: 200,
+    width: EMPLOYEE_COLUMN_WIDTH,
     borderRightWidth: 1,
     borderRightColor: '#E0E0E0',
   },

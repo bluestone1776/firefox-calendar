@@ -1,5 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
-import { format } from 'date-fns';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { DAY_START_HOUR, PX_PER_MIN } from '../../constants/time';
 import { WeeklyHours } from '../../types';
 

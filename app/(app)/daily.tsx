@@ -24,7 +24,12 @@ import {
   deleteWeeklyHours,
 } from '../../src/data/schedule';
 import { Profile, WeeklyHours, Event } from '../../src/types';
-import { DAY_START_HOUR, DAY_END_HOUR, PX_PER_MIN } from '../../src/constants/time';
+import {
+  DAY_START_HOUR,
+  DAY_END_HOUR,
+  PX_PER_MIN,
+  EMPLOYEE_COLUMN_WIDTH,
+} from '../../src/constants/time';
 import { TimeGutter } from '../../src/components/timeline/TimeGutter';
 import { EmployeeColumn } from '../../src/components/timeline/EmployeeColumn';
 import { useAuth } from '../../src/hooks/useAuth';
@@ -727,13 +732,10 @@ export default function DailyScreen() {
               contentContainerStyle={styles.headerScrollContent}
               showsHorizontalScrollIndicator={false}
               scrollEventThrottle={16}
-              onScroll={(event) => {
-                // Sync header scroll with timeline scroll
-                const offsetX = event.nativeEvent.contentOffset.x;
-                if (horizontalScrollRef.current) {
-                  horizontalScrollRef.current.scrollTo({ x: offsetX, animated: false });
-                }
-              }}
+              directionalLockEnabled={true}
+              alwaysBounceHorizontal={true}
+              bounces={true}
+              scrollEnabled={false}
             >
               <View style={styles.headerColumnsContainer}>
                 {profiles.map((profile) => {
@@ -808,13 +810,18 @@ export default function DailyScreen() {
                   ref={horizontalScrollRef}
                   style={styles.columnsScrollView}
                   contentContainerStyle={styles.columnsContent}
-                  showsHorizontalScrollIndicator={true}
+                  showsHorizontalScrollIndicator={false}
                   nestedScrollEnabled={true}
                   pagingEnabled={false}
                   decelerationRate="fast"
-                  snapToInterval={200}
+                  snapToInterval={EMPLOYEE_COLUMN_WIDTH}
                   snapToAlignment="start"
+                  disableIntervalMomentum={true}
                   scrollEventThrottle={16}
+                  directionalLockEnabled={true}
+                  alwaysBounceHorizontal={true}
+                  bounces={true}
+                  removeClippedSubviews={false}
                   onScroll={(event) => {
                     // Sync timeline scroll with header scroll
                     const offsetX = event.nativeEvent.contentOffset.x;
@@ -1528,7 +1535,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   headerColumn: {
-    minWidth: 200,
+    width: EMPLOYEE_COLUMN_WIDTH,
     padding: 12,
     backgroundColor: '#F5F5F5',
     borderRightWidth: 1,

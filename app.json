@@ -10,8 +10,9 @@
     "scheme": "firefox-calendar",
     "extra": {
       "eas": {
-        "projectId": "your-project-id-here"
-      }
+        "projectId": "a1897317-40c0-4172-b4d0-bb8051b2aa34"
+      },
+      "router": {}
     },
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -39,7 +40,10 @@
               "scheme": "firefox-calendar"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -48,6 +52,7 @@
     },
     "plugins": [
       "expo-router"
-    ]
+    ],
+    "owner": "bluestone1776"
   }
 }

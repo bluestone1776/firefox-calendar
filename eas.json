@@ -11,6 +11,10 @@
       },
       "ios": {
         "simulator": true
+      },
+      "node": "20.19.4",
+      "env": {
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
       }
     },
     "preview": {
@@ -20,6 +24,10 @@
       },
       "ios": {
         "simulator": false
+      },
+      "node": "20.19.4",
+      "env": {
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
       }
     },
     "production": {
@@ -28,6 +36,10 @@
       },
       "ios": {
         "simulator": false
+      },
+      "node": "20.19.4",
+      "env": {
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
       }
     }
   },

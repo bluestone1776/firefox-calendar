@@ -66,8 +66,10 @@ export function EventBlock({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, gestureState) => {
         // Only start dragging if vertical movement is significant and not from bottom edge
+        // Also check that horizontal movement is minimal to avoid interfering with horizontal scroll
         const isFromTop = gestureState.moveY - gestureState.y0 < 40; // Top 40px of event
-        return Math.abs(gestureState.dy) > 10 && isFromTop;
+        const isVerticalGesture = Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 2;
+        return Math.abs(gestureState.dy) > 10 && isFromTop && isVerticalGesture;
       },
       onPanResponderGrant: (_, gestureState) => {
         dragStartY.current = gestureState.moveY;

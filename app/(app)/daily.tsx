@@ -116,6 +116,7 @@ export default function DailyScreen() {
   const [useFullDay, setUseFullDay] = useState(false);
   const [autoDayRange, setAutoDayRange] = useState({ startHour: DAY_START_HOUR, endHour: DAY_END_HOUR });
   const [currentTimezone, setCurrentTimezone] = useState<string>(getDefaultTimezone());
+  const [payrollModalVisible, setPayrollModalVisible] = useState(false);
   const verticalScrollRef = useRef<ScrollView>(null);
   const horizontalScrollRef = useRef<ScrollView>(null);
   const headerScrollRef = useRef<ScrollView>(null);
@@ -126,6 +127,24 @@ export default function DailyScreen() {
   const dayEndHour = useFullDay ? DAY_END_HOUR : autoDayRange.endHour;
   const totalMinutes = (dayEndHour - dayStartHour) * 60;
   const totalHeight = totalMinutes * PX_PER_MIN;
+  const showPayrollBar =
+    !isAdmin &&
+    user?.id &&
+    isSameDay(currentDate, toZonedTime(new Date(), currentTimezone));
+  const expectedHoursForUser = (() => {
+    if (!user || !user?.id) return undefined;
+    const weekday = getDay(currentDate);
+    const userId = user?.id;
+    const userHours = weeklyHours.get(userId || '');
+    if (!userHours || !userHours?.day_of_week || userHours?.day_of_week !== weekday) {
+      return undefined;
+    }
+    // TypeScript doesn't narrow correctly, but we've checked above
+    const hours = userHours;
+    const startMinutes = (hours?.start_hour || 0) * 60 + (hours?.start_minute || 0);
+    const endMinutes = (hours?.end_hour || 0) * 60 + (hours?.end_minute || 0);
+    return (endMinutes - startMinutes) / 60;
+  })();
 
   // Load timezone on mount
   useEffect(() => {
@@ -735,37 +754,59 @@ export default function DailyScreen() {
       )}
 
       {/* Daily Confirmation (Staff only, Today only) - Only show if user is logged in */}
-      {!isAdmin && user?.id && isSameDay(currentDate, toZonedTime(new Date(), currentTimezone)) && (
-        <View style={styles.dailyConfirmationContainer}>
-          <DailyConfirmation
-            date={currentDate}
-            expectedHours={(() => {
-              if (!user || !user?.id) return undefined;
-              const weekday = getDay(currentDate);
-              const userId = user?.id;
-              const userHours = weeklyHours.get(userId || '');
-              if (!userHours || !userHours?.day_of_week || userHours?.day_of_week !== weekday) {
-                return undefined;
-              }
-              // TypeScript doesn't narrow correctly, but we've checked above
-              const hours = userHours;
-              const startMinutes = (hours?.start_hour || 0) * 60 + (hours?.start_minute || 0);
-              const endMinutes = (hours?.end_hour || 0) * 60 + (hours?.end_minute || 0);
-              return (endMinutes - startMinutes) / 60;
-            })()}
-            onConfirmationChange={() => {
-              // Optionally refresh data
-            }}
-          />
-          <TouchableOpacity
-            style={styles.weeklyConfirmationButton}
-            onPress={() => router.push('/(app)/weekly-confirmation')}
+      {showPayrollBar && (
+        <>
+          <View style={styles.payrollBar}>
+            <View style={styles.payrollInfo}>
+              <Text style={styles.payrollTitle}>Payroll</Text>
+              <Text style={styles.payrollSubtitle}>Confirm today’s hours</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.payrollButton}
+              onPress={() => setPayrollModalVisible(true)}
+            >
+              <Text style={styles.payrollButtonText}>Open</Text>
+            </TouchableOpacity>
+          </View>
+          <Modal
+            visible={payrollModalVisible}
+            transparent
+            animationType="slide"
+            onRequestClose={() => setPayrollModalVisible(false)}
           >
-            <Text style={styles.weeklyConfirmationButtonText}>
-              📋 Weekly Confirmation
-            </Text>
-          </TouchableOpacity>
-        </View>
+            <View style={styles.modalOverlay}>
+              <View style={[styles.modalContent, styles.payrollModalContent]}>
+                <Text style={styles.modalTitle}>Payroll Confirmation</Text>
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  <DailyConfirmation
+                    date={currentDate}
+                    expectedHours={expectedHoursForUser}
+                    onConfirmationChange={() => {
+                      // Optionally refresh data
+                    }}
+                  />
+                  <TouchableOpacity
+                    style={styles.weeklyConfirmationButton}
+                    onPress={() => {
+                      setPayrollModalVisible(false);
+                      router.push('/(app)/weekly-confirmation');
+                    }}
+                  >
+                    <Text style={styles.weeklyConfirmationButtonText}>
+                      📋 Weekly Confirmation
+                    </Text>
+                  </TouchableOpacity>
+                </ScrollView>
+                <Button
+                  title="Close"
+                  onPress={() => setPayrollModalVisible(false)}
+                  variant="outline"
+                  style={styles.modalButton}
+                />
+              </View>
+            </View>
+          </Modal>
+        </>
       )}
 
       {/* Subtle refreshing indicator - top progress bar */}
@@ -1838,6 +1879,51 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E0E0E0',
     alignItems: 'center',
+  },
+  payrollBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#111827',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  payrollInfo: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  payrollTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  payrollSubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  payrollButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  payrollButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  payrollModalContent: {
+    maxHeight: '80%',
   },
   weeklyConfirmationButtonText: {
     fontSize: 14,

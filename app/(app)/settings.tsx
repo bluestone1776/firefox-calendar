@@ -160,13 +160,15 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Configuration</Text>
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Company Domain:</Text>
-          <Text style={styles.value}>{COMPANY_DOMAIN || 'Not set'}</Text>
+      {isAdmin && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Configuration</Text>
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>Company Domain:</Text>
+            <Text style={styles.value}>{COMPANY_DOMAIN || 'Not set'}</Text>
+          </View>
         </View>
-      </View>
+      )}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Timezone Settings</Text>

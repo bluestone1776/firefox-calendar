@@ -36,7 +36,7 @@ export function DailyConfirmation({
   const [notes, setNotes] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [showDetails, setShowDetails] = useState(true);
+  const [showDetails, setShowDetails] = useState(false);
 
   const dateISO = format(date, 'yyyy-MM-dd');
 
@@ -62,7 +62,7 @@ export function DailyConfirmation({
         setIsConfirmed(false);
         setHours(expectedHours?.toString() || '8.0');
         setNotes('');
-        setShowDetails(true);
+        setShowDetails(false);
       }
     } catch (error: any) {
       // Silently handle errors - table might not exist yet
@@ -70,7 +70,7 @@ export function DailyConfirmation({
       setIsConfirmed(false);
       setHours(expectedHours?.toString() || '8.0');
       setNotes('');
-      setShowDetails(true);
+      setShowDetails(false);
     } finally {
       setLoading(false);
     }
@@ -94,7 +94,7 @@ export function DailyConfirmation({
           setConfirmation(null);
           setHours(expectedHours?.toString() || '8.0');
           setNotes('');
-          setShowDetails(true);
+          setShowDetails(false);
           onConfirmationChange?.();
         } catch (error: any) {
           console.error('Error deleting confirmation:', error);
@@ -181,17 +181,19 @@ export function DailyConfirmation({
             }}
             disabled={saving}
           />
-          {isConfirmed && (
-            <TouchableOpacity
-              style={styles.detailsToggle}
-              onPress={() => setShowDetails((prev) => !prev)}
-              disabled={saving}
-            >
-              <Text style={styles.detailsToggleText}>
-                {showDetails ? 'Hide details' : 'Edit details'}
-              </Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={styles.detailsToggle}
+            onPress={() => setShowDetails((prev) => !prev)}
+            disabled={saving}
+          >
+            <Text style={styles.detailsToggleText}>
+              {showDetails
+                ? 'Hide details'
+                : isConfirmed
+                ? 'Edit details'
+                : 'Add details'}
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -221,7 +223,7 @@ export function DailyConfirmation({
         )}
       </View>
 
-      {(isConfirmed ? showDetails : true) && (
+      {showDetails && (
         <View style={styles.content}>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Hours worked</Text>

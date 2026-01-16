@@ -1,4 +1,4 @@
-import { parse, startOfDay, endOfDay, isValid, isBefore, isSameSecond } from 'date-fns';
+import { parse, startOfDay, endOfDay, isValid, isBefore, isSameSecond, format } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { supabase } from '../lib/supabase';
 import { WeeklyHours, Event } from '../types';
@@ -186,8 +186,21 @@ export async function getEventsForDate(
         // Don't include them in the events list to avoid double display
         return;
       } else {
-        // Regular one-time event
-        expandedEvents.push(event);
+        // For all-day events, check the date directly (not time overlap)
+        if (event.is_all_day && event.type === 'leave') {
+          // Extract the date from UTC ISO string directly (all-day events are stored as YYYY-MM-DDTHH:mm:ss.sssZ)
+          // Parse the date part directly from the ISO string to avoid timezone conversion issues
+          // Format: "2026-01-16T00:00:00.000Z" -> extract "2026-01-16"
+          const eventDateStr = event.start.substring(0, 10); // Extract YYYY-MM-DD from ISO string
+          
+          // Only include if the event date matches the target date
+          if (eventDateStr === dateISO) {
+            expandedEvents.push(event);
+          }
+        } else {
+          // Regular one-time event (use time overlap check from query)
+          expandedEvents.push(event);
+        }
       }
     });
 

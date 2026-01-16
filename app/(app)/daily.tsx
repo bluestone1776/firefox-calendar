@@ -247,16 +247,57 @@ export default function DailyScreen() {
   };
 
   const handleEmptyAreaLongPress = (profileId: string, timeMinutes: number) => {
-    // Long press on empty area - quick add leave
-    router.push({
-      pathname: '/(app)/event-editor',
-      params: {
-        date: format(currentDate, 'yyyy-MM-dd'),
-        userId: profileId,
-        type: 'leave',
-        isAllDay: 'true',
-      },
+    // Check if there's an existing all-day leave event for this profile on this date
+    const profileEvents = events.get(profileId) || [];
+    const currentDateISO = format(currentDate, 'yyyy-MM-dd');
+    
+    // Find all-day leave event for this date
+    const allDayLeaveEvent = profileEvents.find((event) => {
+      if (event.type !== 'leave') return false;
+      
+      // Check if it's all-day via flag
+      if (event.is_all_day) {
+        // For all-day events stored as date-only in UTC, extract the date directly
+        // Format: YYYY-MM-DDTHH:mm:ss.sssZ - extract YYYY-MM-DD part
+        const startUTC = new Date(event.start);
+        const eventDateUTC = format(startUTC, 'yyyy-MM-dd');
+        return eventDateUTC === currentDateISO;
+      }
+      
+      // Fallback: Check if it spans full day (for backward compatibility)
+      const startTime = toZonedTime(new Date(event.start), currentTimezone);
+      const endTime = toZonedTime(new Date(event.end), currentTimezone);
+      const eventDate = format(startTime, 'yyyy-MM-dd');
+      
+      return (
+        eventDate === currentDateISO &&
+        isSameDay(startTime, endTime) &&
+        getHours(startTime) === 0 && getMinutes(startTime) === 0 &&
+        getHours(endTime) === 23 && getMinutes(endTime) === 59
+      );
     });
+    
+    if (allDayLeaveEvent) {
+      // Edit existing all-day leave event
+      console.log('Editing existing all-day leave event', allDayLeaveEvent.id);
+      router.push({
+        pathname: '/(app)/event-editor',
+        params: {
+          eventId: allDayLeaveEvent.id,
+        },
+      });
+    } else {
+      // Create new all-day leave event
+      router.push({
+        pathname: '/(app)/event-editor',
+        params: {
+          date: currentDateISO,
+          userId: profileId,
+          type: 'leave',
+          isAllDay: 'true',
+        },
+      });
+    }
   };
 
   // Compute Now Summary - get current time in selected timezone

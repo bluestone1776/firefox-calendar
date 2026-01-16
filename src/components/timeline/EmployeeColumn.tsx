@@ -52,7 +52,7 @@ export function EmployeeColumn({
     if (event.type !== 'leave') return false;
     if (event.is_all_day) return true;
     
-    // Also check if it spans the full day (00:00 to 23:59)
+    // Fallback: Also check if it spans the full day (00:00 to 23:59) for backward compatibility
     const startTime = toZonedTime(new Date(event.start), timezone);
     const endTime = toZonedTime(new Date(event.end), timezone);
     return (

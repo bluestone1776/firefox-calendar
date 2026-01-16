@@ -409,9 +409,16 @@ export default function EventEditorScreen() {
       };
       
       if (isAllDay && type === 'leave') {
-        // All-day leave: 00:00 to 23:59 in the selected timezone
-        startDateTime = timeInTimezoneToUTC(year, month, day, 0, 0, 0, currentTimezone);
-        endDateTime = timeInTimezoneToUTC(year, month, day, 23, 59, 59, currentTimezone);
+        // All-day leave: Store as date-only (midnight to midnight UTC for the specific date)
+        // This avoids timezone confusion - the date is the same regardless of timezone
+        // Parse the date string directly and create UTC dates
+        const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        // Start: 00:00:00 UTC on the date
+        startDateTime = `${dateStr}T00:00:00.000Z`;
+        // End: 00:00:00 UTC on the next day (exclusive end, standard practice)
+        // This represents the full day without timezone issues
+        const nextDay = new Date(Date.UTC(year, month - 1, day + 1));
+        endDateTime = nextDay.toISOString();
       } else {
         // Validate end > start
         const startTotal = startHour * 60 + startMinute;
@@ -732,7 +739,7 @@ export default function EventEditorScreen() {
           style={styles.saveButton}
         />
 
-        {/* Delete button - only show when editing existing event */}
+        {/* Delete button - only show when editing existing event (not recurring) */}
         {params.eventId && !isRecurring && (
           <Button
             title="Delete Event"
@@ -741,6 +748,9 @@ export default function EventEditorScreen() {
             style={[styles.deleteButton, styles.saveButton]}
           />
         )}
+        
+        {/* Extra padding at bottom to ensure delete button is visible */}
+        {params.eventId && !isRecurring && <View style={{ height: 20 }} />}
       </ScrollView>
 
       {/* Date Picker Modal */}
@@ -909,6 +919,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+    paddingBottom: 32, // Extra padding to ensure delete button is visible
   },
   field: {
     marginBottom: 20,

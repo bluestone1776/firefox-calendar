@@ -67,7 +67,7 @@ export default function PayrollReportScreen() {
     }
     loadTimezone();
     loadProfiles();
-  }, []);
+  }, [isAdmin, profile?.timezone]);
 
   useEffect(() => {
     if (isAdmin && profiles.length > 0) {
@@ -77,6 +77,10 @@ export default function PayrollReportScreen() {
 
   const loadTimezone = async () => {
     try {
+      if (profile?.timezone) {
+        setCurrentTimezone(profile.timezone);
+        return;
+      }
       const tz = await getTimezone();
       setCurrentTimezone(tz);
     } catch (error) {

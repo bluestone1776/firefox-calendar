@@ -57,7 +57,7 @@ export default function WeeklyConfirmationScreen() {
 
   useEffect(() => {
     loadTimezone();
-  }, []);
+  }, [profile?.timezone]);
 
   useEffect(() => {
     if (user?.id) {
@@ -67,6 +67,10 @@ export default function WeeklyConfirmationScreen() {
 
   const loadTimezone = async () => {
     try {
+      if (profile?.timezone) {
+        setCurrentTimezone(profile.timezone);
+        return;
+      }
       const tz = await getTimezone();
       setCurrentTimezone(tz);
     } catch (error) {

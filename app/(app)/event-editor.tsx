@@ -114,10 +114,10 @@ export default function EventEditorScreen() {
   const [typePickerModal, setTypePickerModal] = useState(false);
   const [currentTimezone, setCurrentTimezone] = useState<string>(getDefaultTimezone());
 
-  // Load timezone on mount
+  // Load timezone on mount / profile timezone change
   useEffect(() => {
     loadTimezone();
-  }, []);
+  }, [profile?.timezone]);
 
   // Load profiles if admin
   useEffect(() => {
@@ -142,6 +142,10 @@ export default function EventEditorScreen() {
 
   const loadTimezone = async () => {
     try {
+      if (profile?.timezone) {
+        setCurrentTimezone(profile.timezone);
+        return;
+      }
       const tz = await getTimezone();
       setCurrentTimezone(tz);
     } catch (error) {
@@ -239,48 +243,24 @@ export default function EventEditorScreen() {
 
       setSaving(true);
       try {
-        // Helper: Convert a time in target timezone to UTC (same as regular events)
-        const timeInTimezoneToUTC = (y: number, m: number, d: number, h: number, min: number, sec: number, tz: string): string => {
-          // Start with a UTC date using our components
-          let testUTC = new Date(Date.UTC(y, m - 1, d, h, min, sec));
-          
-          // Check what time this UTC date represents in the target timezone
-          const formatter = new Intl.DateTimeFormat('en-US', {
-            timeZone: tz,
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false
-          });
-          
-          let parts = formatter.formatToParts(testUTC);
-          let targetHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
-          let targetMinute = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
-          
-          // Calculate adjustment needed
-          const desiredMinutes = h * 60 + min;
-          const actualMinutes = targetHour * 60 + targetMinute;
-          let diffMinutes = desiredMinutes - actualMinutes;
-          
-          // Adjust and verify (handle day boundaries)
-          testUTC = new Date(testUTC.getTime() + diffMinutes * 60000);
-          
-          // Verify the result
-          parts = formatter.formatToParts(testUTC);
-          targetHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
-          targetMinute = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
-          
-          // If still not correct, adjust again (handles edge cases)
-          const finalDiff = (h * 60 + min) - (targetHour * 60 + targetMinute);
-          if (finalDiff !== 0) {
-            testUTC = new Date(testUTC.getTime() + finalDiff * 60000);
-          }
-          
-          // Return as UTC ISO string (pure UTC, no timezone offset in the string)
-          return testUTC.toISOString();
+        // Helper: Convert a local time in target timezone to UTC ISO string
+        const timeInTimezoneToUTC = (
+          y: number,
+          m: number,
+          d: number,
+          h: number,
+          min: number,
+          sec: number,
+          tz: string
+        ): string => {
+          const dateTimeStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(
+            2,
+            '0'
+          )} ${String(h).padStart(2, '0')}:${String(min).padStart(
+            2,
+            '0'
+          )}:${String(sec).padStart(2, '0')}`;
+          return fromZonedTime(dateTimeStr, tz).toISOString();
         };
 
         // Save as unified events (working_hours type) for selected days
@@ -352,60 +332,24 @@ export default function EventEditorScreen() {
       // Parse date components
       const [year, month, day] = date.split('-').map(Number);
       
-      // Helper: Convert a time in target timezone to UTC (pure UTC, not offsetted)
+      // Helper: Convert a local time in target timezone to UTC ISO string
       // The components (y, m, d, h, min, sec) represent a time in the given timezone (tz)
-      // Returns an ISO string in UTC
-      const timeInTimezoneToUTC = (y: number, m: number, d: number, h: number, min: number, sec: number, tz: string): string => {
-        // Create a date string representing the time we want
-        const dateTimeStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}T${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
-        
-        // Create a date in local timezone first
-        const localDate = new Date(dateTimeStr);
-        
-        // We need to find what UTC time corresponds to this time in the target timezone
-        // Strategy: create a test UTC date, see what it represents in target timezone,
-        // then adjust until we get the desired time
-        
-        // Start with a UTC date using our components
-        let testUTC = new Date(Date.UTC(y, m - 1, d, h, min, sec));
-        
-        // Check what time this UTC date represents in the target timezone
-        const formatter = new Intl.DateTimeFormat('en-US', {
-          timeZone: tz,
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          hour12: false
-        });
-        
-        let parts = formatter.formatToParts(testUTC);
-        let targetHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
-        let targetMinute = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
-        
-        // Calculate adjustment needed
-        const desiredMinutes = h * 60 + min;
-        const actualMinutes = targetHour * 60 + targetMinute;
-        let diffMinutes = desiredMinutes - actualMinutes;
-        
-        // Adjust and verify (handle day boundaries)
-        testUTC = new Date(testUTC.getTime() + diffMinutes * 60000);
-        
-        // Verify the result
-        parts = formatter.formatToParts(testUTC);
-        targetHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
-        targetMinute = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
-        
-        // If still not correct, adjust again (handles edge cases)
-        const finalDiff = (h * 60 + min) - (targetHour * 60 + targetMinute);
-        if (finalDiff !== 0) {
-          testUTC = new Date(testUTC.getTime() + finalDiff * 60000);
-        }
-        
-        // Return as UTC ISO string (pure UTC, no timezone offset in the string)
-        return testUTC.toISOString();
+      const timeInTimezoneToUTC = (
+        y: number,
+        m: number,
+        d: number,
+        h: number,
+        min: number,
+        sec: number,
+        tz: string
+      ): string => {
+        const dateTimeStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(
+          2,
+          '0'
+        )} ${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}:${String(
+          sec
+        ).padStart(2, '0')}`;
+        return fromZonedTime(dateTimeStr, tz).toISOString();
       };
       
       if (isAllDay && type === 'leave') {

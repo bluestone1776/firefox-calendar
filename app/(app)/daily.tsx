@@ -98,7 +98,7 @@ const persistMissingProfileTimezones = async (
 export default function DailyScreen() {
   const router = useRouter();
   const { isAdmin, user, profile } = useAuth();
-  const [currentDate, setCurrentDate] = useState(() => toZonedTime(new Date(), getDefaultTimezone()));
+  const [currentDate, setCurrentDate] = useState(() => new Date());
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [weeklyHours, setWeeklyHours] = useState<Map<string, WeeklyHours>>(
     new Map()
@@ -113,6 +113,7 @@ export default function DailyScreen() {
   const [selectedWorkingHours, setSelectedWorkingHours] = useState<WeeklyHours | null>(null);
   const [workingHoursModalVisible, setWorkingHoursModalVisible] = useState(false);
   const [viewMode, setViewMode] = useState<'timeline' | 'availability'>('timeline');
+  const [showNowSummary, setShowNowSummary] = useState(true);
   const [useFullDay, setUseFullDay] = useState(false);
   const [autoDayRange, setAutoDayRange] = useState({ startHour: DAY_START_HOUR, endHour: DAY_END_HOUR });
   const [currentTimezone, setCurrentTimezone] = useState<string>(getDefaultTimezone());
@@ -121,6 +122,7 @@ export default function DailyScreen() {
   const horizontalScrollRef = useRef<ScrollView>(null);
   const headerScrollRef = useRef<ScrollView>(null);
   const isFirstMount = useRef(true);
+  const previousTimezoneRef = useRef<string>(getDefaultTimezone());
 
   // Calculate day range
   const dayStartHour = useFullDay ? DAY_START_HOUR : autoDayRange.startHour;
@@ -130,10 +132,13 @@ export default function DailyScreen() {
   const showPayrollBar =
     !isAdmin &&
     user?.id &&
-    isSameDay(currentDate, toZonedTime(new Date(), currentTimezone));
+    isSameDay(
+      toZonedTime(currentDate, currentTimezone),
+      toZonedTime(new Date(), currentTimezone)
+    );
   const expectedHoursForUser = (() => {
     if (!user || !user?.id) return undefined;
-    const weekday = getDay(currentDate);
+    const weekday = getDay(toZonedTime(currentDate, currentTimezone));
     const userId = user?.id;
     const userHours = weeklyHours.get(userId || '');
     if (!userHours || !userHours?.day_of_week || userHours?.day_of_week !== weekday) {
@@ -146,19 +151,30 @@ export default function DailyScreen() {
     return (endMinutes - startMinutes) / 60;
   })();
 
-  // Load timezone on mount
+  // Load timezone on mount / profile timezone change
   useEffect(() => {
     loadTimezone();
-  }, []);
+  }, [profile?.timezone]);
 
   // Update currentDate timezone when timezone changes (but only after initial load)
   useEffect(() => {
-    // Convert currentDate to the new timezone while preserving the same calendar date
-    // Only update if timezone has actually changed from default
     if (!isFirstMount.current) {
-      const dateStr = format(currentDate, 'yyyy-MM-dd');
-      setCurrentDate(toZonedTime(parse(dateStr, 'yyyy-MM-dd', new Date()), currentTimezone));
+      const previousTimezone = previousTimezoneRef.current || currentTimezone;
+      const wasToday = isSameDay(
+        toZonedTime(currentDate, previousTimezone),
+        toZonedTime(new Date(), previousTimezone)
+      );
+
+      if (wasToday) {
+        setCurrentDate(new Date());
+      } else {
+        const dateStr = formatTZ(currentDate, 'yyyy-MM-dd', { timeZone: previousTimezone });
+        setCurrentDate(
+          fromZonedTime(parse(dateStr, 'yyyy-MM-dd', new Date()), currentTimezone)
+        );
+      }
     }
+    previousTimezoneRef.current = currentTimezone;
   }, [currentTimezone]);
 
   // Load data for current date
@@ -173,6 +189,10 @@ export default function DailyScreen() {
 
   const loadTimezone = async () => {
     try {
+      if (profile?.timezone) {
+        setCurrentTimezone(profile.timezone);
+        return;
+      }
       const tz = await getTimezone();
       setCurrentTimezone(tz);
     } catch (error) {
@@ -195,7 +215,7 @@ export default function DailyScreen() {
       const weekday = getDay(dateInTimezone);
 
       // Get date in ISO format (YYYY-MM-DD) in the target timezone
-      const dateISO = format(dateInTimezone, 'yyyy-MM-dd');
+      const dateISO = formatTZ(currentDate, 'yyyy-MM-dd', { timeZone: currentTimezone });
 
       // Load profiles
       const profilesData = await listProfiles();
@@ -252,7 +272,7 @@ export default function DailyScreen() {
 
   const navigateDate = (direction: 'prev' | 'next' | 'today') => {
     if (direction === 'today') {
-      setCurrentDate(toZonedTime(new Date(), currentTimezone));
+      setCurrentDate(new Date());
     } else if (direction === 'prev') {
       setCurrentDate(subDays(currentDate, 1));
     } else {
@@ -262,20 +282,21 @@ export default function DailyScreen() {
 
   const formatDate = (date: Date) => {
     const today = toZonedTime(new Date(), currentTimezone);
-    if (isSameDay(date, today)) {
+    const dateInTimezone = toZonedTime(date, currentTimezone);
+    if (isSameDay(dateInTimezone, today)) {
       return 'Today';
     }
-    return format(date, 'EEE, MMM d');
+    return formatTZ(date, 'EEE, MMM d', { timeZone: currentTimezone });
   };
 
   const formatDateFull = (date: Date) => {
-    return format(date, 'EEE, MMM d, yyyy');
+    return formatTZ(date, 'EEE, MMM d, yyyy', { timeZone: currentTimezone });
   };
 
   const handleAddEvent = () => {
     router.push({
       pathname: '/(app)/event-editor',
-      params: { date: format(currentDate, 'yyyy-MM-dd') },
+      params: { date: formatTZ(currentDate, 'yyyy-MM-dd', { timeZone: currentTimezone }) },
     });
   };
 
@@ -284,7 +305,7 @@ export default function DailyScreen() {
     router.push({
       pathname: '/(app)/event-editor',
       params: {
-        date: format(currentDate, 'yyyy-MM-dd'),
+        date: formatTZ(currentDate, 'yyyy-MM-dd', { timeZone: currentTimezone }),
         type: 'leave',
         isAllDay: 'true',
       },
@@ -318,7 +339,7 @@ export default function DailyScreen() {
     router.push({
       pathname: '/(app)/event-editor',
       params: {
-        date: format(currentDate, 'yyyy-MM-dd'),
+        date: formatTZ(currentDate, 'yyyy-MM-dd', { timeZone: currentTimezone }),
         userId: profileId,
         startHour: hour.toString(),
         startMinute: snappedMinute.toString(),
@@ -331,7 +352,7 @@ export default function DailyScreen() {
   const handleEmptyAreaLongPress = (profileId: string, timeMinutes: number) => {
     // Check if there's an existing all-day leave event for this profile on this date
     const profileEvents = events.get(profileId) || [];
-    const currentDateISO = format(currentDate, 'yyyy-MM-dd');
+    const currentDateISO = formatTZ(currentDate, 'yyyy-MM-dd', { timeZone: currentTimezone });
     
     // Find all-day leave event for this date
     const allDayLeaveEvent = profileEvents.find((event) => {
@@ -691,8 +712,17 @@ export default function DailyScreen() {
       </View>
 
       {/* Now Summary Header */}
-      {isToday && (
+      {isToday && showNowSummary && (
         <View style={styles.nowSummary}>
+          <View style={styles.summaryHeader}>
+            <Text style={styles.summaryTitle}>Now</Text>
+            <TouchableOpacity
+              onPress={() => setShowNowSummary(false)}
+              style={styles.summaryToggle}
+            >
+              <Text style={styles.summaryToggleText}>Hide</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}>
               <Text style={styles.summaryLabel}>Working</Text>
@@ -713,6 +743,14 @@ export default function DailyScreen() {
             </Text>
           )}
         </View>
+      )}
+      {isToday && !showNowSummary && (
+        <TouchableOpacity
+          style={styles.summaryShowButton}
+          onPress={() => setShowNowSummary(true)}
+        >
+          <Text style={styles.summaryShowButtonText}>Show status summary</Text>
+        </TouchableOpacity>
       )}
 
       {/* View Toggle */}
@@ -1070,7 +1108,9 @@ export default function DailyScreen() {
               data={DATE_OPTIONS}
               keyExtractor={(item) => item.value}
               renderItem={({ item }) => {
-                const isSelected = item.value === format(currentDate, 'yyyy-MM-dd');
+                const isSelected =
+                  item.value ===
+                  formatTZ(currentDate, 'yyyy-MM-dd', { timeZone: currentTimezone });
                 return (
                   <TouchableOpacity
                     style={[styles.dateOption, isSelected && styles.dateOptionSelected]}
@@ -1142,9 +1182,10 @@ export default function DailyScreen() {
                   <Text style={styles.eventModalTimeLabel}>Duration:</Text>
                   <Text style={styles.eventModalTime}>
                     {(() => {
+                      // Duration should be based on the raw UTC timestamps to avoid DST/date shifts.
                       const duration = differenceInMinutes(
-                        toZonedTime(new Date(selectedEvent.end), currentTimezone),
-                        toZonedTime(new Date(selectedEvent.start), currentTimezone)
+                        new Date(selectedEvent.end),
+                        new Date(selectedEvent.start)
                       );
                       if (duration < 60) return `${duration}m`;
                       const hours = Math.floor(duration / 60);
@@ -1722,6 +1763,27 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
   },
+  summaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  summaryTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+    textTransform: 'uppercase',
+  },
+  summaryToggle: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  summaryToggleText: {
+    fontSize: 12,
+    color: '#2563EB',
+    fontWeight: '600',
+  },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -1729,6 +1791,17 @@ const styles = StyleSheet.create({
   },
   summaryItem: {
     alignItems: 'center',
+  },
+  summaryShowButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 4,
+    alignItems: 'flex-end',
+  },
+  summaryShowButtonText: {
+    fontSize: 12,
+    color: '#2563EB',
+    fontWeight: '600',
   },
   summaryLabel: {
     fontSize: 12,

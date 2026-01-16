@@ -122,7 +122,11 @@ export default function WeeklyScreen() {
     setLoading(true);
     try {
       // Load timezone
-      const timezone = await getTimezone().catch(() => getDefaultTimezone());
+      const selectedProfile = profiles.find((p) => p.id === userId);
+      const timezone =
+        selectedProfile?.timezone ||
+        profile?.timezone ||
+        (await getTimezone().catch(() => getDefaultTimezone()));
       // Load weekly hours (convert from UTC to user's timezone)
       const existingHours = await getWeeklyHoursForUser(userId, timezone);
       const newHours: Record<number, DayHours> = {

@@ -56,7 +56,7 @@ export default function LoginScreen() {
         const { error } = await supabase.auth.signInWithOtp({
           email: email.toLowerCase().trim(),
           options: {
-            emailRedirectTo: undefined, // No redirect needed for mobile
+            emailRedirectTo: 'firefox-calendar://auth/callback',
           },
         });
 
@@ -81,6 +81,9 @@ export default function LoginScreen() {
         const { data, error } = await supabase.auth.signUp({
           email: email.toLowerCase().trim(),
           password: password,
+          options: {
+            emailRedirectTo: 'firefox-calendar://auth/callback',
+          },
         });
 
         if (error) {

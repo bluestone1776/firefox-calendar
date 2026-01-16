@@ -191,7 +191,8 @@ export function EventBlock({
             {event.title}
           </Text>
           
-          {height > 50 && (
+          {/* Only show "Until" for events longer than 30 minutes to avoid overflow */}
+          {height > 50 && durationMinutes > 30 && (
             <Text style={[styles.timeEnd, getTypeTextStyle()]} numberOfLines={1}>
               Until {format(endTime, 'h:mm a')}
             </Text>

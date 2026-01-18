@@ -19,7 +19,7 @@ import {
 import { getWeeklyHoursForUser } from '../../src/data/schedule';
 import { PayrollConfirmation, WeeklyHours } from '../../src/types';
 import { Button } from '../../src/components/ui/Button';
-import { getTimezone, getDefaultTimezone } from '../../src/utils/timezone';
+import { getDefaultTimezone } from '../../src/utils/timezone';
 
 const WEEKDAYS = [
   { name: 'Monday', index: 1 },
@@ -57,7 +57,7 @@ export default function WeeklyConfirmationScreen() {
 
   useEffect(() => {
     loadTimezone();
-  }, [profile?.timezone]);
+  }, []);
 
   useEffect(() => {
     if (user?.id) {
@@ -67,12 +67,7 @@ export default function WeeklyConfirmationScreen() {
 
   const loadTimezone = async () => {
     try {
-      if (profile?.timezone) {
-        setCurrentTimezone(profile.timezone);
-        return;
-      }
-      const tz = await getTimezone();
-      setCurrentTimezone(tz);
+      setCurrentTimezone(getDefaultTimezone());
     } catch (error) {
       console.error('Error loading timezone:', error);
     }

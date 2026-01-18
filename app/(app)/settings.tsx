@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, Modal, FlatList, TouchableOpacity, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
 import { supabase } from '../../src/lib/supabase';
-import { updateProfileTimezone } from '../../src/data/profiles';
 import { COMPANY_DOMAIN } from '../../src/constants/company';
 import { Button } from '../../src/components/ui/Button';
-import { getTimezone, setTimezone, COMMON_TIMEZONES, getDefaultTimezone } from '../../src/utils/timezone';
 // DISABLED: Notifications not working with Expo Go
 // import {
 //   requestNotificationPermissions,
@@ -20,49 +18,14 @@ import { getTimezone, setTimezone, COMMON_TIMEZONES, getDefaultTimezone } from '
 export default function SettingsScreen() {
   const router = useRouter();
   const { user, profile, loading, isAdmin } = useAuth();
-  const [selectedTimezone, setSelectedTimezone] = useState<string>(getDefaultTimezone());
-  const [timezonePickerVisible, setTimezonePickerVisible] = useState(false);
-  const [loadingTimezone, setLoadingTimezone] = useState(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [loadingNotifications, setLoadingNotifications] = useState(true);
 
   useEffect(() => {
-    loadTimezone();
+    // Timezone is locked to Brisbane; no loading needed.
     // DISABLED: Notifications not working with Expo Go
     // loadNotificationStatus();
-  }, [profile?.timezone]);
-
-  const loadTimezone = async () => {
-    try {
-      if (profile?.timezone) {
-        setSelectedTimezone(profile.timezone);
-        return;
-      }
-      const tz = await getTimezone();
-      setSelectedTimezone(tz);
-    } catch (error) {
-      console.error('Error loading timezone:', error);
-    } finally {
-      setLoadingTimezone(false);
-    }
-  };
-
-  const handleTimezoneChange = async (timezone: string) => {
-    try {
-      if (!profile?.id) {
-        Alert.alert('Error', 'No profile found to update timezone.');
-        return;
-      }
-      await setTimezone(timezone);
-      await updateProfileTimezone(profile.id, timezone);
-      setSelectedTimezone(timezone);
-      setTimezonePickerVisible(false);
-      Alert.alert('Success', 'Timezone updated.');
-    } catch (error: any) {
-      console.error('Error setting timezone:', error);
-      Alert.alert('Error', 'Failed to update timezone');
-    }
-  };
+  }, []);
 
   // DISABLED: Notifications not working with Expo Go
   // const loadNotificationStatus = async () => {
@@ -171,24 +134,13 @@ export default function SettingsScreen() {
       )}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Timezone Settings</Text>
-        <TouchableOpacity
-          style={[styles.infoRow, styles.timezoneRowHighlight]}
-          onPress={() => setTimezonePickerVisible(true)}
-        >
-          <View style={styles.timezoneInfo}>
-            <Text style={styles.timezoneLabel}>Current Timezone</Text>
-            <Text style={styles.timezoneValue}>
-              {loadingTimezone
-                ? 'Loading...'
-                : COMMON_TIMEZONES.find((tz) => tz.value === selectedTimezone)?.label ||
-                  selectedTimezone}
-            </Text>
-          </View>
-          <Text style={styles.changeText}>Tap to Change →</Text>
-        </TouchableOpacity>
+        <Text style={styles.sectionTitle}>Timezone</Text>
+        <View style={styles.infoRow}>
+          <Text style={styles.label}>Timezone:</Text>
+          <Text style={styles.value}>Australia/Brisbane (AEST)</Text>
+        </View>
         <Text style={styles.timezoneHint}>
-          All times in the calendar will be displayed in your selected timezone.
+          Timezone is locked to Brisbane for consistency.
         </Text>
       </View>
 
@@ -242,48 +194,6 @@ export default function SettingsScreen() {
         />
       </View>
 
-      {/* Timezone Picker Modal */}
-      <Modal
-        visible={timezonePickerVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setTimezonePickerVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Timezone</Text>
-            <FlatList
-              data={COMMON_TIMEZONES}
-              keyExtractor={(item) => item.value}
-              renderItem={({ item }) => {
-                const isSelected = item.value === selectedTimezone;
-                return (
-                  <TouchableOpacity
-                    style={[styles.timezoneOption, isSelected && styles.timezoneOptionSelected]}
-                    onPress={() => handleTimezoneChange(item.value)}
-                  >
-                    <Text
-                      style={[
-                        styles.timezoneOptionText,
-                        isSelected && styles.timezoneOptionTextSelected,
-                      ]}
-                    >
-                      {item.label}
-                    </Text>
-                    {isSelected && <Text style={styles.checkmark}>✓</Text>}
-                  </TouchableOpacity>
-                );
-              }}
-            />
-            <Button
-              title="Cancel"
-              onPress={() => setTimezonePickerVisible(false)}
-              variant="outline"
-              style={styles.modalButton}
-            />
-          </View>
-        </View>
-      </Modal>
     </ScrollView>
   );
 }

@@ -1,7 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const TIMEZONE_STORAGE_KEY = '@calendar_timezone';
-const DEFAULT_TZ = process.env.EXPO_PUBLIC_DEFAULT_TZ || 'Australia/Sydney';
+const DEFAULT_TZ = 'Australia/Brisbane';
 
 // Common timezones
 export const COMMON_TIMEZONES = [
@@ -27,25 +24,15 @@ export const COMMON_TIMEZONES = [
  * Get the user's selected timezone or default
  */
 export async function getTimezone(): Promise<string> {
-  try {
-    const stored = await AsyncStorage.getItem(TIMEZONE_STORAGE_KEY);
-    return stored || DEFAULT_TZ;
-  } catch (error) {
-    console.error('Error getting timezone:', error);
-    return DEFAULT_TZ;
-  }
+  return DEFAULT_TZ;
 }
 
 /**
  * Set the user's timezone preference
  */
 export async function setTimezone(timezone: string): Promise<void> {
-  try {
-    await AsyncStorage.setItem(TIMEZONE_STORAGE_KEY, timezone);
-  } catch (error) {
-    console.error('Error setting timezone:', error);
-    throw error;
-  }
+  // Timezone is locked to Brisbane; no-op to preserve callers.
+  void timezone;
 }
 
 /**

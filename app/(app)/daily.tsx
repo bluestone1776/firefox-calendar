@@ -14,7 +14,7 @@ import {
 import { useRouter } from 'expo-router';
 import { format, parse, getDay, getHours, getMinutes, addDays, subDays, isSameDay, startOfDay, endOfDay, addMinutes, differenceInMinutes, setHours, setMinutes } from 'date-fns';
 import { toZonedTime, fromZonedTime, format as formatTZ } from 'date-fns-tz';
-import { listProfiles, updateProfileTimezone } from '../../src/data/profiles';
+import { listProfiles } from '../../src/data/profiles';
 import {
   getWeeklyHoursForWeekday,
   getEventsForDate,
@@ -43,57 +43,13 @@ import {
   hasEventConflict,
   UserStatus,
 } from '../../src/utils/schedule';
-import { COMMON_TIMEZONES, getTimezone, getDefaultTimezone } from '../../src/utils/timezone';
+import { getDefaultTimezone } from '../../src/utils/timezone';
 
 // date-fns-tz is now used instead of dayjs
 
 const DEFAULT_TZ = process.env.EXPO_PUBLIC_DEFAULT_TZ || 'Australia/Sydney';
 const HEADER_ROW_HEIGHT = 40;
-const ALL_TIMEZONES = COMMON_TIMEZONES.map((tz) => tz.value);
 
-const assignUniqueTimezones = (profiles: Profile[], fallbackTz: string) => {
-  const used = new Set(
-    profiles
-      .map((profile) => profile.timezone)
-      .filter((timezone): timezone is string => Boolean(timezone))
-  );
-  const available = ALL_TIMEZONES.filter((tz) => !used.has(tz));
-  let nextIndex = 0;
-
-  return profiles.map((profile) => {
-    if (profile.timezone) {
-      return profile;
-    }
-
-    const nextTimezone = available[nextIndex] || fallbackTz;
-    nextIndex += 1;
-    return { ...profile, timezone: nextTimezone };
-  });
-};
-
-const persistMissingProfileTimezones = async (
-  originalProfiles: Profile[],
-  enrichedProfiles: Profile[]
-) => {
-  const originalTimezoneById = new Map(
-    originalProfiles.map((profile) => [profile.id, profile.timezone])
-  );
-
-  const updates = enrichedProfiles.filter((profile) => {
-    const existingTimezone = originalTimezoneById.get(profile.id);
-    return !existingTimezone && Boolean(profile.timezone);
-  });
-
-  if (updates.length === 0) {
-    return;
-  }
-
-  await Promise.all(
-    updates.map((profile) =>
-      updateProfileTimezone(profile.id, profile.timezone as string)
-    )
-  );
-};
 
 export default function DailyScreen() {
   const router = useRouter();
@@ -154,7 +110,7 @@ export default function DailyScreen() {
   // Load timezone on mount / profile timezone change
   useEffect(() => {
     loadTimezone();
-  }, [profile?.timezone]);
+  }, []);
 
   // Update currentDate timezone when timezone changes (but only after initial load)
   useEffect(() => {
@@ -189,12 +145,7 @@ export default function DailyScreen() {
 
   const loadTimezone = async () => {
     try {
-      if (profile?.timezone) {
-        setCurrentTimezone(profile.timezone);
-        return;
-      }
-      const tz = await getTimezone();
-      setCurrentTimezone(tz);
+      setCurrentTimezone(getDefaultTimezone());
     } catch (error) {
       console.error('Error loading timezone:', error);
     }
@@ -219,19 +170,7 @@ export default function DailyScreen() {
 
       // Load profiles
       const profilesData = await listProfiles();
-      const profilesWithTimezones = assignUniqueTimezones(
-        profilesData,
-        currentTimezone
-      );
-      setProfiles(profilesWithTimezones);
-      try {
-        await persistMissingProfileTimezones(
-          profilesData,
-          profilesWithTimezones
-        );
-      } catch (error) {
-        console.error('Error persisting profile timezones:', error);
-      }
+      setProfiles(profilesData);
 
       // Load weekly hours for this weekday (convert from UTC to user's timezone)
       const hoursData = await getWeeklyHoursForWeekday(weekday, currentTimezone);
@@ -884,11 +823,9 @@ export default function DailyScreen() {
                   return (
                     <View key={profile.id} style={styles.headerColumn}>
                       <View style={styles.headerNameContainer}>
-                      <Text style={styles.headerName} numberOfLines={1}>
-                          {profile.timezone
-                            ? `${profile.email.split('@')[0]} · ${profile.timezone}`
-                            : profile.email.split('@')[0]}
-                      </Text>
+                        <Text style={styles.headerName} numberOfLines={1}>
+                          {profile.email.split('@')[0]}
+                        </Text>
                       </View>
                       {hasConflict && <Text style={styles.headerConflict}>⚠️</Text>}
                     </View>

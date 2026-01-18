@@ -22,7 +22,7 @@ import { TIME_BLOCK_MINUTES, DAY_START_HOUR, DAY_END_HOUR } from '../../src/cons
 import { Input } from '../../src/components/ui/Input';
 import { Button } from '../../src/components/ui/Button';
 import { supabase } from '../../src/lib/supabase';
-import { getTimezone, getDefaultTimezone } from '../../src/utils/timezone';
+import { getDefaultTimezone } from '../../src/utils/timezone';
 
 const DEFAULT_TZ = process.env.EXPO_PUBLIC_DEFAULT_TZ || 'Australia/Sydney';
 
@@ -117,7 +117,7 @@ export default function EventEditorScreen() {
   // Load timezone on mount / profile timezone change
   useEffect(() => {
     loadTimezone();
-  }, [profile?.timezone]);
+  }, []);
 
   // Load profiles if admin
   useEffect(() => {
@@ -142,12 +142,7 @@ export default function EventEditorScreen() {
 
   const loadTimezone = async () => {
     try {
-      if (profile?.timezone) {
-        setCurrentTimezone(profile.timezone);
-        return;
-      }
-      const tz = await getTimezone();
-      setCurrentTimezone(tz);
+      setCurrentTimezone(getDefaultTimezone());
     } catch (error) {
       console.error('Error loading timezone:', error);
     }

@@ -21,7 +21,7 @@ import {
 } from '../../src/data/payroll';
 import { Profile, PayrollConfirmation } from '../../src/types';
 import { Button } from '../../src/components/ui/Button';
-import { getTimezone, getDefaultTimezone } from '../../src/utils/timezone';
+import { getDefaultTimezone } from '../../src/utils/timezone';
 
 type ReportRow = {
   profile: Profile;
@@ -67,7 +67,7 @@ export default function PayrollReportScreen() {
     }
     loadTimezone();
     loadProfiles();
-  }, [isAdmin, profile?.timezone]);
+  }, [isAdmin]);
 
   useEffect(() => {
     if (isAdmin && profiles.length > 0) {
@@ -77,12 +77,7 @@ export default function PayrollReportScreen() {
 
   const loadTimezone = async () => {
     try {
-      if (profile?.timezone) {
-        setCurrentTimezone(profile.timezone);
-        return;
-      }
-      const tz = await getTimezone();
-      setCurrentTimezone(tz);
+      setCurrentTimezone(getDefaultTimezone());
     } catch (error) {
       console.error('Error loading timezone:', error);
     }

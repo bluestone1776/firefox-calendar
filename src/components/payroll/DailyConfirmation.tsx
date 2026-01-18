@@ -165,9 +165,9 @@ export function DailyConfirmation({
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerTitleGroup}>
-          <Text style={styles.title}>
-            {isToday ? 'Confirm Hours Worked Today' : `Confirm Hours for ${format(date, 'MMM d')}`}
-          </Text>
+        <Text style={styles.title}>
+          {isToday ? 'Confirm Hours Worked Today' : `Confirm Hours for ${format(date, 'MMM d')}`}
+        </Text>
           <Text style={styles.subtitle}>Daily payroll confirmation</Text>
         </View>
         <View style={styles.toggleRow}>
@@ -181,11 +181,11 @@ export function DailyConfirmation({
             }}
             disabled={saving}
           />
-          <TouchableOpacity
+        <TouchableOpacity
             style={styles.detailsToggle}
             onPress={() => setShowDetails((prev) => !prev)}
-            disabled={saving}
-          >
+          disabled={saving}
+        >
             <Text style={styles.detailsToggleText}>
               {showDetails
                 ? 'Hide details'
@@ -193,7 +193,7 @@ export function DailyConfirmation({
                 ? 'Edit details'
                 : 'Add details'}
             </Text>
-          </TouchableOpacity>
+        </TouchableOpacity>
         </View>
       </View>
 
@@ -228,14 +228,14 @@ export function DailyConfirmation({
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Hours worked</Text>
             <View style={styles.hoursInputRow}>
-              <TextInput
+            <TextInput
                 style={[styles.input, styles.hoursInput]}
-                value={hours}
-                onChangeText={handleHoursChange}
-                keyboardType="decimal-pad"
-                placeholder="8.0"
-                editable={!saving}
-              />
+              value={hours}
+              onChangeText={handleHoursChange}
+              keyboardType="decimal-pad"
+              placeholder="8.0"
+              editable={!saving}
+            />
               <Text style={styles.hoursSuffix}>hrs</Text>
             </View>
             {expectedHours !== undefined && (

@@ -172,7 +172,7 @@ export default function DailyScreen() {
         setCurrentDate(
           fromZonedTime(parse(dateStr, 'yyyy-MM-dd', new Date()), currentTimezone)
         );
-      }
+    }
     }
     previousTimezoneRef.current = currentTimezone;
   }, [currentTimezone]);
@@ -816,24 +816,24 @@ export default function DailyScreen() {
               <View style={[styles.modalContent, styles.payrollModalContent]}>
                 <Text style={styles.modalTitle}>Payroll Confirmation</Text>
                 <ScrollView showsVerticalScrollIndicator={false}>
-                  <DailyConfirmation
-                    date={currentDate}
+          <DailyConfirmation
+            date={currentDate}
                     expectedHours={expectedHoursForUser}
-                    onConfirmationChange={() => {
-                      // Optionally refresh data
-                    }}
-                  />
-                  <TouchableOpacity
-                    style={styles.weeklyConfirmationButton}
+            onConfirmationChange={() => {
+              // Optionally refresh data
+            }}
+          />
+          <TouchableOpacity
+            style={styles.weeklyConfirmationButton}
                     onPress={() => {
                       setPayrollModalVisible(false);
                       router.push('/(app)/weekly-confirmation');
                     }}
-                  >
-                    <Text style={styles.weeklyConfirmationButtonText}>
-                      📋 Weekly Confirmation
-                    </Text>
-                  </TouchableOpacity>
+          >
+            <Text style={styles.weeklyConfirmationButtonText}>
+              📋 Weekly Confirmation
+            </Text>
+          </TouchableOpacity>
                 </ScrollView>
                 <Button
                   title="Close"
@@ -841,7 +841,7 @@ export default function DailyScreen() {
                   variant="outline"
                   style={styles.modalButton}
                 />
-              </View>
+        </View>
             </View>
           </Modal>
         </>
@@ -884,11 +884,11 @@ export default function DailyScreen() {
                   return (
                     <View key={profile.id} style={styles.headerColumn}>
                       <View style={styles.headerNameContainer}>
-                        <Text style={styles.headerName} numberOfLines={1}>
+                      <Text style={styles.headerName} numberOfLines={1}>
                           {profile.timezone
                             ? `${profile.email.split('@')[0]} · ${profile.timezone}`
                             : profile.email.split('@')[0]}
-                        </Text>
+                      </Text>
                       </View>
                       {hasConflict && <Text style={styles.headerConflict}>⚠️</Text>}
                     </View>

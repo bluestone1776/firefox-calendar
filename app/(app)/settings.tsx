@@ -161,13 +161,13 @@ export default function SettingsScreen() {
       </View>
 
       {isAdmin && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Configuration</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Company Domain:</Text>
-            <Text style={styles.value}>{COMPANY_DOMAIN || 'Not set'}</Text>
-          </View>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Configuration</Text>
+        <View style={styles.infoRow}>
+          <Text style={styles.label}>Company Domain:</Text>
+          <Text style={styles.value}>{COMPANY_DOMAIN || 'Not set'}</Text>
         </View>
+      </View>
       )}
 
       <View style={styles.section}>

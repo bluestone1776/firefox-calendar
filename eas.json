@@ -31,6 +31,20 @@
       }
     },
     "production": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": false
+      },
+      "node": "20.19.4",
+      "env": {
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
+      }
+    },
+    "release-apk": {
+      "distribution": "internal",
       "android": {
         "buildType": "apk"
       },

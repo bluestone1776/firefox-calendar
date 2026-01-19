@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 // date-fns-tz is now used instead of dayjs
 import { Profile, WeeklyHours, Event } from '../../types';
 import {
@@ -113,18 +113,19 @@ export function EmployeeColumn({
           )}
         </View>
       )}
-      <TouchableOpacity
+      <View
         style={[
           styles.timeline,
           { height: totalHeight },
           hasAllDayLeave && styles.timelineLeave
         ]}
-        onPress={handleTimelinePress}
-        onLongPress={handleTimelineLongPress}
-        delayLongPress={500}
-        activeOpacity={1}
-        delayPressIn={50}
       >
+        <Pressable
+          style={styles.timelinePressArea}
+          onPress={handleTimelinePress}
+          onLongPress={handleTimelineLongPress}
+          delayLongPress={500}
+        />
         {workingHours && !hasAllDayLeave && (
           <WorkingHoursShade 
             workingHours={workingHours} 
@@ -150,7 +151,7 @@ export function EmployeeColumn({
             />
           );
         })}
-      </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -193,6 +194,9 @@ const styles = StyleSheet.create({
   timeline: {
     position: 'relative',
     backgroundColor: '#FFFFFF',
+  },
+  timelinePressArea: {
+    ...StyleSheet.absoluteFillObject,
   },
   timelineLeave: {
     backgroundColor: '#FFF8E1',

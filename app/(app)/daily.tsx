@@ -10,6 +10,7 @@ import {
   FlatList,
   Switch,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { format, parse, getDay, getHours, getMinutes, addDays, subDays, isSameDay, startOfDay, endOfDay, addMinutes, differenceInMinutes, setHours, setMinutes } from 'date-fns';
@@ -889,7 +890,7 @@ export default function DailyScreen() {
                   style={styles.columnsScrollView}
                   contentContainerStyle={styles.columnsContent}
                   showsHorizontalScrollIndicator={false}
-                  nestedScrollEnabled={true}
+                  nestedScrollEnabled={Platform.OS !== 'android'}
                   pagingEnabled={false}
                   decelerationRate="fast"
                   snapToInterval={EMPLOYEE_COLUMN_WIDTH}

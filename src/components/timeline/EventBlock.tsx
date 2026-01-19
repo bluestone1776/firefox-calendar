@@ -259,6 +259,9 @@ export function EventBlock({
         onPressIn={() => setIsPressed(true)}
         onPressOut={() => setIsPressed(false)}
         delayLongPress={500}
+        hitSlop={8}
+        onStartShouldSetResponder={() => true}
+        onMoveShouldSetResponder={() => false}
       >
         <Animated.View
           style={[
@@ -288,6 +291,9 @@ export function EventBlock({
         onPressIn={() => setIsPressed(true)}
         onPressOut={() => setIsPressed(false)}
         delayLongPress={500}
+        hitSlop={8}
+        onStartShouldSetResponder={() => true}
+        onMoveShouldSetResponder={() => false}
       >
         <Animated.View
           style={[

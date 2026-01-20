@@ -197,6 +197,7 @@ const styles = StyleSheet.create({
   },
   timelinePressArea: {
     ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
   },
   timelineLeave: {
     backgroundColor: '#FFF8E1',

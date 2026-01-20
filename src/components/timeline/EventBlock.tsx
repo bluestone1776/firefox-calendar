@@ -251,63 +251,53 @@ export function EventBlock({
     }
   };
 
+  const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
   if (onDragEnd) {
     return (
-      <Pressable
+      <AnimatedPressable
         onPress={handlePress}
         onLongPress={handleLongPress}
         onPressIn={() => setIsPressed(true)}
         onPressOut={() => setIsPressed(false)}
         delayLongPress={500}
         hitSlop={8}
-        onStartShouldSetResponder={() => true}
-        onMoveShouldSetResponder={() => false}
+        style={[
+          blockStyle,
+          {
+            top: isDragging ? animatedTop : initialStartPosition,
+            height: height,
+            opacity: isDragging ? 0.9 : 1,
+            transform: [{ scale: isDragging ? 1.05 : isPressed ? 1.02 : 1 }],
+          },
+        ]}
+        {...movePanResponder.panHandlers}
       >
-        <Animated.View
-          style={[
-            blockStyle,
-            {
-              top: isDragging ? animatedTop : initialStartPosition,
-              height: height,
-              opacity: isDragging ? 0.9 : 1,
-              transform: [
-                { scale: isDragging ? 1.05 : isPressed ? 1.02 : 1 },
-              ],
-            },
-          ]}
-          {...movePanResponder.panHandlers}
-        >
-          {content}
-        </Animated.View>
-      </Pressable>
+        {content}
+      </AnimatedPressable>
     );
   }
 
   if (onPress || onLongPress) {
     return (
-      <Pressable
+      <AnimatedPressable
         onPress={handlePress}
         onLongPress={handleLongPress}
         onPressIn={() => setIsPressed(true)}
         onPressOut={() => setIsPressed(false)}
         delayLongPress={500}
         hitSlop={8}
-        onStartShouldSetResponder={() => true}
-        onMoveShouldSetResponder={() => false}
+        style={[
+          blockStyle,
+          {
+            top: initialStartPosition,
+            height: height,
+            transform: [{ scale: isPressed ? 1.02 : 1 }],
+          },
+        ]}
       >
-        <Animated.View
-          style={[
-            blockStyle,
-            {
-              top: initialStartPosition,
-              height: height,
-              transform: [{ scale: isPressed ? 1.02 : 1 }],
-            },
-          ]}
-        >
-          {content}
-        </Animated.View>
-      </Pressable>
+        {content}
+      </AnimatedPressable>
     );
   }
 
@@ -337,6 +327,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 3,
+    zIndex: 10,
   },
   dragging: {
     shadowOpacity: 0.3,

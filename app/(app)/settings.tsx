@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, Switch, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
 import { supabase } from '../../src/lib/supabase';
 import { COMPANY_DOMAIN } from '../../src/constants/company';
 import { Button } from '../../src/components/ui/Button';
+import { MemberManagement } from '../../src/components/MemberManagement';
+import { updateProfileName } from '../../src/data/profiles';
 // DISABLED: Notifications not working with Expo Go
 // import {
 //   requestNotificationPermissions,
@@ -17,15 +19,19 @@ import { Button } from '../../src/components/ui/Button';
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { user, profile, loading, isAdmin } = useAuth();
+  const { user, profile, loading, isAdmin, refreshProfile } = useAuth();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [loadingNotifications, setLoadingNotifications] = useState(true);
+  const [editingName, setEditingName] = useState(false);
+  const [newName, setNewName] = useState(profile?.name || '');
+  const [savingName, setSavingName] = useState(false);
 
   useEffect(() => {
     // Timezone is locked to Brisbane; no loading needed.
     // DISABLED: Notifications not working with Expo Go
     // loadNotificationStatus();
-  }, []);
+    setNewName(profile?.name || '');
+  }, [profile]);
 
   // DISABLED: Notifications not working with Expo Go
   // const loadNotificationStatus = async () => {
@@ -73,6 +79,40 @@ export default function SettingsScreen() {
   //   }
   // };
 
+  const handleSaveName = async () => {
+    if (!newName.trim()) {
+      Alert.alert('Error', 'Name cannot be empty');
+      return;
+    }
+
+    if (newName.trim() === profile?.name) {
+      setEditingName(false);
+      return;
+    }
+
+    try {
+      setSavingName(true);
+      if (user?.id) {
+        await updateProfileName(user.id, newName.trim());
+        // Refresh profile to show updated name immediately
+        await refreshProfile();
+        Alert.alert('Success', 'Your name has been updated');
+        setEditingName(false);
+      }
+    } catch (error: any) {
+      console.error('Error saving name:', error);
+      Alert.alert('Error', error.message || 'Failed to update name');
+      setNewName(profile?.name || '');
+    } finally {
+      setSavingName(false);
+    }
+  };
+
+  const handleCancelNameEdit = () => {
+    setNewName(profile?.name || '');
+    setEditingName(false);
+  };
+
   const handleLogout = async () => {
     Alert.alert(
       'Logout',
@@ -111,10 +151,58 @@ export default function SettingsScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Account</Text>
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Email:</Text>
-          <Text style={styles.value}>{user?.email || 'N/A'}</Text>
-        </View>
+        
+        {editingName ? (
+          <View style={styles.nameEditContainer}>
+            <TextInput
+              style={styles.nameInput}
+              value={newName}
+              onChangeText={setNewName}
+              placeholder="Enter your name"
+              editable={!savingName}
+              autoFocus
+            />
+            <View style={styles.nameEditActions}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={handleCancelNameEdit}
+                disabled={savingName}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={handleSaveName}
+                disabled={savingName}
+              >
+                {savingName ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <>
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Name:</Text>
+              <TouchableOpacity
+                style={styles.nameDisplay}
+                onPress={() => setEditingName(true)}
+              >
+                <Text style={styles.value}>
+                  {profile?.name || 'Tap to add'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Email:</Text>
+              <Text style={styles.value}>{user?.email || 'N/A'}</Text>
+            </View>
+          </>
+        )}
+
         <View style={styles.infoRow}>
           <Text style={styles.label}>Role:</Text>
           <Text style={styles.value}>
@@ -182,6 +270,13 @@ export default function SettingsScreen() {
             onPress={() => router.push('/(app)/payroll-report')}
             style={styles.adminButton}
           />
+        </View>
+      )}
+
+      {isAdmin && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Team Management</Text>
+          <MemberManagement isAdmin={isAdmin} currentUserId={user?.id} />
         </View>
       )}
 
@@ -349,5 +444,57 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 14,
     color: '#999999',
+  },
+  nameEditContainer: {
+    paddingVertical: 12,
+    gap: 8,
+  },
+  nameInput: {
+    borderWidth: 1,
+    borderColor: '#D0D0D0',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#000000',
+  },
+  nameEditActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#D0D0D0',
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666666',
+  },
+  saveButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: '#007AFF',
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  nameDisplay: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    backgroundColor: '#F9F9F9',
+    borderRadius: 6,
   },
 });

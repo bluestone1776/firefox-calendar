@@ -88,6 +88,31 @@ export function useAuth() {
     []
   );
 
+  const refreshProfile = useCallback(async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setProfile(null);
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (error) {
+      console.error('Error refreshing profile:', error);
+      return null;
+    }
+
+    setProfile(data);
+    return data;
+  }, []);
+
   useEffect(() => {
     let mounted = true;
 
@@ -142,5 +167,6 @@ export function useAuth() {
     isAdmin: profile?.role === 'admin',
     ensureProfile: (userId: string, email: string) =>
       ensureProfile(userId, email),
+    refreshProfile,
   };
 }

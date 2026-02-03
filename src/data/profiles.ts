@@ -80,3 +80,77 @@ export async function getMyProfile(): Promise<Profile | null> {
     throw error;
   }
 }
+
+/**
+ * Updates a profile's name (admin can update any, staff can update only their own)
+ */
+export async function updateProfileName(
+  profileId: string,
+  name: string
+): Promise<Profile> {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ name })
+      .eq('id', profileId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating profile name:', error);
+      throw new Error(`Failed to update name: ${error.message}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in updateProfileName:', error);
+    throw error;
+  }
+}
+
+/**
+ * Updates a profile's role (admin only)
+ */
+export async function updateProfileRole(
+  profileId: string,
+  role: 'admin' | 'staff'
+): Promise<Profile> {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ role })
+      .eq('id', profileId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating profile role:', error);
+      throw new Error(`Failed to update role: ${error.message}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in updateProfileRole:', error);
+    throw error;
+  }
+}
+
+/**
+ * Deletes a profile (admin only)
+ */
+export async function deleteProfile(profileId: string): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', profileId);
+
+    if (error) {
+      console.error('Error deleting profile:', error);
+      throw new Error(`Failed to delete profile: ${error.message}`);
+    }
+  } catch (error) {
+    console.error('Error in deleteProfile:', error);
+    throw error;
+  }
+}

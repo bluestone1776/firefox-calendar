@@ -106,6 +106,7 @@ export default function EventEditorScreen() {
   );
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isEventOwner, setIsEventOwner] = useState(true);
   const [timePickerModal, setTimePickerModal] = useState<{
     visible: boolean;
     type: 'start' | 'end';
@@ -180,6 +181,18 @@ export default function EventEditorScreen() {
       const startTime = toZonedTime(new Date(event.start), tz);
       const endTime = toZonedTime(new Date(event.end), tz);
 
+      // Check if user owns this event or is admin
+      const isOwner = event.profile_id === user?.id;
+      const canEdit = isAdmin || isOwner;
+      
+      // If staff user tries to edit someone else's event, show read-only view
+      if (!canEdit) {
+        setIsEventOwner(false);
+        Alert.alert('Info', 'You can view this event but cannot edit it.');
+      } else {
+        setIsEventOwner(true);
+      }
+
       setSelectedUserId(event.profile_id);
       setDate(format(startTime, 'yyyy-MM-dd'));
       setStartHour(getHours(startTime));
@@ -214,6 +227,9 @@ export default function EventEditorScreen() {
   const selectedProfile = isAdmin
     ? profiles.find((p) => p.id === selectedUserId)
     : profile;
+
+  // Check if user can edit this event
+  const canEditEvent = isAdmin || isEventOwner;
 
   const handleSave = async () => {
     // Validation
@@ -505,7 +521,8 @@ export default function EventEditorScreen() {
             <Text style={styles.label}>Date *</Text>
             <TouchableOpacity
               style={styles.pickerButton}
-              onPress={() => setDatePickerModal(true)}
+              onPress={() => canEditEvent && setDatePickerModal(true)}
+              disabled={!canEditEvent}
             >
               <Text style={styles.pickerButtonText}>
                 {format(toZonedTime(parse(date, 'yyyy-MM-dd', new Date()), currentTimezone), 'EEE, MMM d, yyyy')}
@@ -603,7 +620,8 @@ export default function EventEditorScreen() {
             <Text style={styles.label}>Start Time *</Text>
             <TouchableOpacity
               style={styles.pickerButton}
-              onPress={() => setTimePickerModal({ visible: true, type: 'start' })}
+              onPress={() => canEditEvent && setTimePickerModal({ visible: true, type: 'start' })}
+              disabled={!canEditEvent}
             >
               <Text style={styles.pickerButtonText}>
                 {formatTime(startHour, startMinute)}
@@ -658,35 +676,48 @@ export default function EventEditorScreen() {
                   : "Enter event title"
             }
             style={styles.input}
+            editable={canEditEvent}
           />
         </View>
 
-        <Button
-          title={
-            isRecurring 
-              ? "Save Weekly Schedule" 
-              : params.eventId 
-                ? "Update Event" 
-                : "Save Event"
-          }
-          onPress={handleSave}
-          disabled={
-            saving || 
-            (isRecurring 
-              ? recurringDays.size === 0 
-              : !isAllDay && !title.trim())
-          }
-          style={styles.saveButton}
-        />
+        {/* Show save button only if user can edit */}
+        {canEditEvent && (
+          <Button
+            title={
+              isRecurring 
+                ? "Save Weekly Schedule" 
+                : params.eventId 
+                  ? "Update Event" 
+                  : "Save Event"
+            }
+            onPress={handleSave}
+            disabled={
+              saving || 
+              (isRecurring 
+                ? recurringDays.size === 0 
+                : !isAllDay && !title.trim())
+            }
+            style={styles.saveButton}
+          />
+        )}
 
-        {/* Delete button - only show when editing existing event (not recurring) */}
-        {params.eventId && !isRecurring && (
+        {/* Delete button - only show when editing existing event (not recurring) and user is owner/admin */}
+        {params.eventId && !isRecurring && canEditEvent && (
           <Button
             title="Delete Event"
             onPress={handleDelete}
             disabled={saving}
             style={[styles.deleteButton, styles.saveButton]}
           />
+        )}
+
+        {/* Read-only message when viewing other's event */}
+        {!canEditEvent && params.eventId && (
+          <View style={styles.readOnlyMessageContainer}>
+            <Text style={styles.readOnlyMessage}>
+              You can view this event but cannot edit or delete it.
+            </Text>
+          </View>
         )}
         
         {/* Extra padding at bottom to ensure delete button is visible */}
@@ -975,5 +1006,17 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     marginTop: 16,
+  },
+  readOnlyMessageContainer: {
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    backgroundColor: '#FFF3CD',
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  readOnlyMessage: {
+    fontSize: 14,
+    color: '#856404',
+    fontWeight: '500',
   },
 });

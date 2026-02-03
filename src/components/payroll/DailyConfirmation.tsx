@@ -278,36 +278,36 @@ export function DailyConfirmation({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginVertical: 8,
+    borderRadius: 8, // Reduced from 12
+    padding: 10, // Reduced from 16 to make more compact
+    marginVertical: 4, // Reduced from 8
     borderWidth: 1,
     borderColor: '#E5E7EB',
     shadowColor: '#111827',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 }, // Reduced shadow
+    shadowOpacity: 0.05, // Reduced shadow
+    shadowRadius: 4, // Reduced shadow
+    elevation: 1, // Reduced elevation
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 10,
-    gap: 12,
+    marginBottom: 6, // Reduced from 10
+    gap: 8, // Reduced from 12
   },
   headerTitleGroup: {
     flex: 1,
   },
   title: {
-    fontSize: 16,
+    fontSize: 14, // Reduced from 16
     fontWeight: '600',
     color: '#000000',
   },
   subtitle: {
-    fontSize: 12,
+    fontSize: 11, // Reduced from 12
     color: '#6B7280',
-    marginTop: 4,
+    marginTop: 2, // Reduced from 4
   },
   toggleRow: {
     alignItems: 'flex-end',
@@ -328,12 +328,12 @@ const styles = StyleSheet.create({
   metaRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 12,
+    gap: 6, // Reduced from 8
+    marginBottom: 8, // Reduced from 12
   },
   pill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 8, // Reduced from 10
+    paddingVertical: 3, // Reduced from 4
     borderRadius: 999,
     backgroundColor: '#F3F4F6',
     borderWidth: 1,

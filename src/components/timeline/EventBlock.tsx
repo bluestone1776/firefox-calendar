@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, PanResponder, Animated, Pressable } from 'react-native';
 import { Event } from '../../types';
-import { DAY_START_HOUR, DAY_END_HOUR, PX_PER_MIN, TIME_BLOCK_MINUTES } from '../../constants/time';
+import { DAY_START_HOUR, DAY_END_HOUR, PX_PER_MIN, TIME_BLOCK_MINUTES, COMPACT_EVENT_HEIGHT, MIN_EVENT_HEIGHT } from '../../constants/time';
 import { format, getHours, getMinutes, differenceInMinutes, addMinutes, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 
@@ -107,6 +107,9 @@ export function EventBlock({
   });
 
   const height = durationMinutes * PX_PER_MIN;
+  const isCompact = height < COMPACT_EVENT_HEIGHT;
+  const isTiny = height < MIN_EVENT_HEIGHT;
+  const isSmallEvent = durationMinutes < 120; // < 2 hours
 
   // Style based on event type
   const getTypeStyle = () => {
@@ -175,26 +178,35 @@ export function EventBlock({
             </Text>
           )}
         </>
+      ) : isCompact ? (
+        // Compact "pill" view for small events - no times, just title
+        <View style={styles.compactContent}>
+          <Text style={[styles.compactTitle, getTypeTextStyle()]} numberOfLines={1} ellipsizeMode="tail">
+            {event.title}
+          </Text>
+        </View>
       ) : (
-        // Regular event display
+        // Regular event display with full details
         <>
-          <View style={styles.timeHeader}>
-            <Text style={[styles.timeStart, getTypeTextStyle()]} numberOfLines={1}>
-              {format(startTime, 'h:mm')}
-            </Text>
-            {height > 40 && (
-              <Text style={[styles.duration, getTypeTextStyle()]} numberOfLines={1}>
-                {formatDuration(durationMinutes)}
+          {!isSmallEvent && (
+            <View style={styles.timeHeader}>
+              <Text style={[styles.timeStart, getTypeTextStyle()]} numberOfLines={1}>
+                {format(startTime, 'h:mm')}
               </Text>
-            )}
-          </View>
+              {height > 40 && (
+                <Text style={[styles.duration, getTypeTextStyle()]} numberOfLines={1}>
+                  {formatDuration(durationMinutes)}
+                </Text>
+              )}
+            </View>
+          )}
           
           <Text style={[styles.title, getTypeTextStyle()]} numberOfLines={height > 50 ? 2 : 1}>
             {event.title}
           </Text>
           
-          {/* Only show "Until" for events longer than 30 minutes to avoid overflow */}
-          {height > 50 && durationMinutes > 30 && (
+          {/* Only show "Until" for events longer than 2 hours to avoid overflow */}
+          {!isSmallEvent && height > 50 && durationMinutes > 30 && (
             <Text style={[styles.timeEnd, getTypeTextStyle()]} numberOfLines={1}>
               Until {format(endTime, 'h:mm a')}
             </Text>
@@ -319,7 +331,7 @@ export function EventBlock({
 const styles = StyleSheet.create({
   block: {
     position: 'absolute',
-    padding: 10,
+    padding: 6,
     borderRadius: 8,
     overflow: 'visible',
     shadowColor: '#000',
@@ -415,7 +427,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 2,
   },
   timeStart: {
     fontSize: 12,
@@ -430,14 +442,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: 2,
     lineHeight: 18,
   },
   timeEnd: {
     fontSize: 11,
     fontWeight: '500',
     opacity: 0.85,
-    marginTop: 4,
+    marginTop: 2,
   },
   dragIndicator: {
     position: 'absolute',
@@ -472,5 +484,17 @@ const styles = StyleSheet.create({
   },
   defaultText: {
     color: '#424242',
+  },
+  compactContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 6,
+  },
+  compactTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
+    lineHeight: 14,
   },
 });

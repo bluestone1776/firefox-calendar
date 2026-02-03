@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { format, parse, getDay, getHours, getMinutes, addDays, subDays, isSameDay, startOfDay, endOfDay, addMinutes, differenceInMinutes, setHours, setMinutes } from 'date-fns';
 import { toZonedTime, fromZonedTime, format as formatTZ } from 'date-fns-tz';
 import { listProfiles } from '../../src/data/profiles';
@@ -143,6 +143,13 @@ export default function DailyScreen() {
     }
     loadData(isFirstLoad);
   }, [currentDate, currentTimezone]);
+
+  // Refresh data when screen comes into focus (e.g., after returning from settings)
+  const handleFocus = useCallback(() => {
+    loadData(false);
+  }, []);
+
+  useFocusEffect(handleFocus);
 
   const loadTimezone = async () => {
     try {
@@ -825,7 +832,7 @@ export default function DailyScreen() {
                     <View key={profile.id} style={styles.headerColumn}>
                       <View style={styles.headerNameContainer}>
                         <Text style={styles.headerName} numberOfLines={1}>
-                          {profile.email.split('@')[0]}
+                          {profile.name || profile.email.split('@')[0]}
                         </Text>
                       </View>
                       {hasConflict && <Text style={styles.headerConflict}>⚠️</Text>}
@@ -989,7 +996,7 @@ export default function DailyScreen() {
               <View key={profile.id} style={styles.availabilityCard}>
                 <View style={styles.availabilityHeader}>
                   <Text style={styles.availabilityName}>
-                    {profile.email.split('@')[0]}
+                    {profile.name || profile.email.split('@')[0]}
                   </Text>
                   <View
                     style={[

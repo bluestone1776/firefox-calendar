@@ -106,7 +106,7 @@ export function EmployeeColumn({
       {showHeader && (
         <View style={[styles.header, hasAllDayLeave && styles.headerLeave]}>
           <Text style={[styles.name, hasAllDayLeave && styles.nameLeave]} numberOfLines={1}>
-            {profile.email.split('@')[0]}
+            {profile.name || profile.email.split('@')[0]}
           </Text>
           {hasAllDayLeave && (
             <Text style={styles.leaveBadge}>🏖️ Leave</Text>

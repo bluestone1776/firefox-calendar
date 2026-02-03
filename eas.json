@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 13.2.0"
+    "version": ">= 13.2.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -18,7 +19,7 @@
       }
     },
     "preview": {
-      "distribution": "internal",
+      "distribution": "store",
       "android": {
         "buildType": "apk"
       },
@@ -31,12 +32,12 @@
       }
     },
     "production": {
-      "distribution": "internal",
+      "distribution": "store",
       "android": {
         "buildType": "apk"
       },
       "ios": {
-        "simulator": false
+        "autoIncrement": true
       },
       "node": "20.19.4",
       "env": {
@@ -58,6 +59,11 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "james.stone87@yahoo.com",
+        "ascAppId": "6758045979"
+      }
+    }
   }
 }

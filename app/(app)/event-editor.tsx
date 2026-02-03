@@ -636,7 +636,8 @@ export default function EventEditorScreen() {
             <Text style={styles.label}>End Time *</Text>
             <TouchableOpacity
               style={styles.pickerButton}
-              onPress={() => setTimePickerModal({ visible: true, type: 'end' })}
+              onPress={() => canEditEvent && setTimePickerModal({ visible: true, type: 'end' })}
+              disabled={!canEditEvent}
             >
               <Text style={styles.pickerButtonText}>
                 {formatTime(endHour, endMinute)}
@@ -651,7 +652,8 @@ export default function EventEditorScreen() {
             <Text style={styles.label}>Type *</Text>
             <TouchableOpacity
               style={styles.pickerButton}
-              onPress={() => setTypePickerModal(true)}
+              onPress={() => canEditEvent && setTypePickerModal(true)}
+              disabled={!canEditEvent}
             >
               <Text style={styles.pickerButtonText}>
                 {type.charAt(0).toUpperCase() + type.slice(1)}

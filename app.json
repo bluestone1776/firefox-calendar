@@ -1,13 +1,13 @@
 {
   "expo": {
-    "name": "firefox-calendar",
+  "name": "Firefox Calendar",
     "slug": "firefox-calendar",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "scheme": "firefox-calendar",
+  "scheme": "firefox-calendar",
     "extra": {
       "eas": {
         "projectId": "c6f6e91b-795e-45d8-9fde-3ecd39ec137e"

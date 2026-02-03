@@ -23,6 +23,7 @@ import { Input } from '../../src/components/ui/Input';
 import { Button } from '../../src/components/ui/Button';
 import { supabase } from '../../src/lib/supabase';
 import { getDefaultTimezone } from '../../src/utils/timezone';
+import { getTimezone } from '../../src/utils/timezone';
 
 const DEFAULT_TZ = process.env.EXPO_PUBLIC_DEFAULT_TZ || 'Australia/Sydney';
 

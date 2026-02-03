@@ -197,10 +197,10 @@ export default function PayrollReportScreen() {
     try {
       const csv = generateCSV();
       const fileName = `payroll-report-${format(startDate, 'yyyy-MM-dd')}-to-${format(endDate, 'yyyy-MM-dd')}.csv`;
-      const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+      const fileUri = `${FileSystem.Directory}${fileName}`;
 
       await FileSystem.writeAsStringAsync(fileUri, csv, {
-        encoding: FileSystem.EncodingType.UTF8,
+        encoding: 'utf8',
       });
 
       const isAvailable = await Sharing.isAvailableAsync();
